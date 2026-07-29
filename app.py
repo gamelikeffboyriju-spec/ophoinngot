@@ -18,6 +18,10 @@ import sys
 import atexit
 import requests
 import schedule
+import uuid
+import pty
+import termios
+import fcntl
 
 from flask import Flask
 from threading import Thread
@@ -26,7 +30,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "Bot is running"
+    return "🤖 BRONX ULTRA OSINT BOT v15.0 is running!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -36,7 +40,7 @@ def keep_alive():
     t = Thread(target=run_flask)
     t.daemon = True
     t.start()
-    print("Flask Keep-Alive server started.")
+    print("🚀 Flask Keep-Alive server started.")
 
 BOT_START_TIME = datetime.now()
 
@@ -85,6 +89,7 @@ user_prime = {}
 user_vip = {}
 free_user_enabled = True
 pending_payments = {}
+bot_monitor = {}
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -128,7 +133,8 @@ ADMIN_COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
     ["🔒 Lock Bot", "🟢 Running All Code"],
     ["👑 Admin Panel", "📞 Contact Owner"],
     ["🤖 MPX Ai", "⏱ Uptime"],
-    ["📂 Global History", "💲 Price List"]
+    ["📂 Global History", "💲 Price List"],
+    ["🖥️ Bot Manager", "📊 System Stats"]
 ]
 
 def init_db():
@@ -159,6 +165,8 @@ def init_db():
                      (setting_key TEXT PRIMARY KEY, setting_value TEXT)''')
         c.execute('''CREATE TABLE IF NOT EXISTS pending_payments
                      (user_id INTEGER, plan_type TEXT, plan_name TEXT, days INTEGER, price TEXT, timestamp TEXT)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS bot_settings
+                     (setting_key TEXT PRIMARY KEY, setting_value TEXT)''')
         c.execute('INSERT OR IGNORE INTO admins (user_id) VALUES (?)', (OWNER_ID,))
         if ADMIN_ID != OWNER_ID:
             c.execute('INSERT OR IGNORE INTO admins (user_id) VALUES (?)', (ADMIN_ID,))
@@ -168,6 +176,8 @@ def init_db():
                   ('hosting_hours', str(FREE_USER_HOURS)))
         c.execute('INSERT OR IGNORE INTO free_user_settings (setting_key, setting_value) VALUES (?, ?)', 
                   ('enabled', 'True'))
+        c.execute('INSERT OR IGNORE INTO bot_settings (setting_key, setting_value) VALUES (?, ?)',
+                  ('auto_restart', 'True'))
         conn.commit()
         conn.close()
         logger.info("Database initialized successfully.")
@@ -235,6 +245,14 @@ def get_free_user_settings():
     conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
     c = conn.cursor()
     c.execute('SELECT setting_key, setting_value FROM free_user_settings')
+    settings = {key: value for key, value in c.fetchall()}
+    conn.close()
+    return settings
+
+def get_bot_settings():
+    conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+    c = conn.cursor()
+    c.execute('SELECT setting_key, setting_value FROM bot_settings')
     settings = {key: value for key, value in c.fetchall()}
     conn.close()
     return settings
@@ -381,6 +399,20 @@ def get_file_content(file_path):
         logger.error(f"Error reading file {file_path}: {e}")
         return None
 
+def get_last_log_lines(log_path, lines=20):
+    """Get last N lines from log file"""
+    try:
+        if not os.path.exists(log_path):
+            return "No log file found"
+        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+            all_lines = f.readlines()
+            last_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+            return ''.join(last_lines)
+    except Exception as e:
+        return f"Error reading log: {e}"
+
+# =============== COMPLETE FIXED RUN SCRIPT ===============
+
 def run_script(script_path, script_owner_id, user_folder, file_name, message_obj_for_reply, attempt=1):
     max_attempts = 2
     if attempt > max_attempts:
@@ -403,54 +435,223 @@ def run_script(script_path, script_owner_id, user_folder, file_name, message_obj
              remove_user_file_db(script_owner_id, file_name)
              return
 
-        logger.info(f"Starting long-running Python process for {script_key}")
+        # CREATE LOG FILE WITH LINE BUFFERING
         log_file_path = os.path.join(user_folder, f"{os.path.splitext(file_name)[0]}.log")
-        log_file = None; process = None
-        try: log_file = open(log_file_path, 'w', encoding='utf-8', errors='ignore')
-        except Exception as e:
-             logger.error(f"Failed to open log file '{log_file_path}' for {script_key}: {e}", exc_info=True)
-             bot.reply_to(message_obj_for_reply, f"❌ Failed to open log file '{log_file_path}': {e}")
-             return
+        log_file = None
+        process = None
+        
         try:
-            startupinfo = None; creationflags = 0
-            if os.name == 'nt':
-                 startupinfo = subprocess.STARTUPINFO(); startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                 startupinfo.wShowWindow = subprocess.SW_HIDE
-            process = subprocess.Popen(
-                [sys.executable, script_path], cwd=user_folder, stdout=log_file, stderr=log_file,
-                stdin=subprocess.PIPE, startupinfo=startupinfo, creationflags=creationflags,
-                encoding='utf-8', errors='ignore'
-            )
-            logger.info(f"Started Python process {process.pid} for {script_key}")
-            bot_scripts[script_key] = {
-                'process': process, 'log_file': log_file, 'file_name': file_name,
-                'chat_id': message_obj_for_reply.chat.id,
-                'script_owner_id': script_owner_id,
-                'start_time': datetime.now(), 'user_folder': user_folder, 'type': 'py', 'script_key': script_key
-            }
-            bot.reply_to(message_obj_for_reply, f"✅ Python script '{file_name}' started! (PID: {process.pid})")
-        except FileNotFoundError:
-             logger.error(f"Python interpreter {sys.executable} not found for long run {script_key}")
-             bot.reply_to(message_obj_for_reply, f"❌ Python interpreter '{sys.executable}' not found.")
-             if log_file and not log_file.closed: log_file.close()
-             if script_key in bot_scripts: del bot_scripts[script_key]
+            log_file = open(log_file_path, 'w', encoding='utf-8', errors='ignore', buffering=1)
         except Exception as e:
-            if log_file and not log_file.closed: log_file.close()
+            logger.error(f"Failed to open log file '{log_file_path}' for {script_key}: {e}", exc_info=True)
+            bot.reply_to(message_obj_for_reply, f"❌ Failed to open log file '{log_file_path}': {e}")
+            return
+
+        # SETUP ENVIRONMENT
+        env = os.environ.copy()
+        env['PYTHONPATH'] = user_folder + os.pathsep + env.get('PYTHONPATH', '')
+        env['PYTHONUNBUFFERED'] = '1'  # Force unbuffered output
+        env['PYTHONIOENCODING'] = 'utf-8'
+
+        # START PROCESS
+        try:
+            startupinfo = None
+            creationflags = 0
+            if os.name == 'nt':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+                creationflags = subprocess.CREATE_NO_WINDOW
+
+            # Use CREATE_NEW_PROCESS_GROUP to avoid signals
+            if sys.platform == 'win32':
+                creationflags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+
+            process = subprocess.Popen(
+                [sys.executable, script_path],
+                cwd=user_folder,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,  # ✅ Merge stderr into stdout
+                stdin=subprocess.DEVNULL,  # ✅ FIXED: No stdin blocking
+                startupinfo=startupinfo,
+                creationflags=creationflags if sys.platform == 'win32' else 0,
+                encoding='utf-8',
+                errors='ignore',
+                close_fds=True,
+                shell=False,
+                env=env
+            )
+
+            # ✅ Wait for process to initialize
+            time.sleep(3)
+
+            # ✅ CHECK IF PROCESS IS RUNNING
+            if process.poll() is None:
+                logger.info(f"✅ Started Python process {process.pid} for {script_key}")
+                
+                bot_scripts[script_key] = {
+                    'process': process,
+                    'log_file': log_file,
+                    'file_name': file_name,
+                    'chat_id': message_obj_for_reply.chat.id,
+                    'script_owner_id': script_owner_id,
+                    'start_time': datetime.now(),
+                    'user_folder': user_folder,
+                    'type': 'py',
+                    'script_key': script_key,
+                    'log_path': log_file_path
+                }
+                
+                bot.reply_to(message_obj_for_reply, 
+                            f"✅ **Script Started Successfully!**\n\n"
+                            f"📁 File: `{file_name}`\n"
+                            f"🆔 PID: `{process.pid}`\n"
+                            f"👤 User: `{script_owner_id}`\n\n"
+                            f"⏳ Bot is initializing...\n"
+                            f"📜 Check logs using control buttons!\n\n"
+                            f"⚠️ If bot doesn't respond, check logs for errors.")
+                
+                # ✅ START LIVE MONITOR
+                threading.Thread(target=monitor_bot_live, args=(script_key, process, log_file_path, file_name, script_owner_id), daemon=True).start()
+                
+            else:
+                # ❌ PROCESS CRASHED IMMEDIATELY
+                error_code = process.poll()
+                logger.error(f"❌ Process {script_key} crashed immediately! Return code: {error_code}")
+                
+                # Read log file
+                log_content = get_last_log_lines(log_file_path, 20)
+                
+                # Check for common errors
+                error_hint = ""
+                if "ModuleNotFoundError" in log_content or "ImportError" in log_content:
+                    error_hint = "\n🔧 **Missing Module!** Try installing dependencies."
+                elif "SyntaxError" in log_content:
+                    error_hint = "\n🔧 **Syntax Error!** Check your code."
+                elif "PermissionError" in log_content:
+                    error_hint = "\n🔧 **Permission Error!** Check file permissions."
+                elif "Address already in use" in log_content:
+                    error_hint = "\n🔧 **Port in use!** Try a different port."
+                elif "Invalid token" in log_content:
+                    error_hint = "\n🔧 **Invalid Bot Token!** Check your TOKEN."
+                
+                bot.reply_to(message_obj_for_reply, 
+                            f"❌ **Script Crashed Immediately!**\n\n"
+                            f"📁 File: `{file_name}`\n"
+                            f"🆔 PID: {process.pid}\n"
+                            f"💀 Return Code: {error_code}\n\n"
+                            f"📜 **Last Log Lines:**\n```\n{log_content[:1500]}\n```\n{error_hint}")
+                
+                if log_file and not log_file.closed:
+                    log_file.close()
+                if script_key in bot_scripts:
+                    del bot_scripts[script_key]
+                return
+
+        except FileNotFoundError:
+            logger.error(f"Python interpreter {sys.executable} not found for long run {script_key}")
+            bot.reply_to(message_obj_for_reply, f"❌ Python interpreter '{sys.executable}' not found.")
+            if log_file and not log_file.closed:
+                log_file.close()
+            if script_key in bot_scripts:
+                del bot_scripts[script_key]
+        except Exception as e:
+            if log_file and not log_file.closed:
+                log_file.close()
             error_msg = f"❌ Error starting Python script '{file_name}': {str(e)}"
             logger.error(error_msg, exc_info=True)
             bot.reply_to(message_obj_for_reply, error_msg)
+            
             if process and process.poll() is None:
-                 logger.warning(f"Killing potentially started Python process {process.pid} for {script_key}")
-                 kill_process_tree({'process': process, 'log_file': log_file, 'script_key': script_key})
-            if script_key in bot_scripts: del bot_scripts[script_key]
+                logger.warning(f"Killing potentially started Python process {process.pid} for {script_key}")
+                kill_process_tree({'process': process, 'log_file': log_file, 'script_key': script_key})
+            if script_key in bot_scripts:
+                del bot_scripts[script_key]
+
     except Exception as e:
         error_msg = f"❌ Unexpected error running Python script '{file_name}': {str(e)}"
         logger.error(error_msg, exc_info=True)
         bot.reply_to(message_obj_for_reply, error_msg)
+        
         if script_key in bot_scripts:
-             logger.warning(f"Cleaning up {script_key} due to error in run_script.")
-             kill_process_tree(bot_scripts[script_key])
-             del bot_scripts[script_key]
+            logger.warning(f"Cleaning up {script_key} due to error in run_script.")
+            kill_process_tree(bot_scripts[script_key])
+            del bot_scripts[script_key]
+
+# =============== LIVE BOT MONITOR ===============
+
+def monitor_bot_live(script_key, process, log_path, file_name, user_id):
+    """Monitor bot live and detect crashes"""
+    try:
+        # Wait for bot to initialize
+        time.sleep(10)
+        
+        if script_key not in bot_scripts:
+            logger.info(f"Bot {script_key} already removed from tracking")
+            return
+        
+        # Check if process is still running
+        if process.poll() is not None:
+            # Process died
+            error_code = process.poll()
+            log_content = get_last_log_lines(log_path, 15)
+            
+            logger.error(f"❌ Bot {script_key} died! Return code: {error_code}")
+            
+            bot.send_message(OWNER_ID,
+                f"❌ **Bot Crashed!**\n\n"
+                f"📁 File: `{file_name}`\n"
+                f"👤 User: `{user_id}`\n"
+                f"💀 Return Code: {error_code}\n\n"
+                f"📜 **Last Logs:**\n```\n{log_content[:1500]}\n```")
+            
+            if script_key in bot_scripts:
+                del bot_scripts[script_key]
+            return
+        
+        # Send success notification to owner
+        bot.send_message(OWNER_ID,
+            f"✅ **Bot Running Successfully!**\n\n"
+            f"📁 File: `{file_name}`\n"
+            f"👤 User: `{user_id}`\n"
+            f"🆔 PID: {process.pid}\n\n"
+            f"⏱ Uptime: Running...")
+        
+        # Keep monitoring
+        while script_key in bot_scripts:
+            try:
+                proc = psutil.Process(process.pid)
+                if not proc.is_running() or proc.status() == psutil.STATUS_ZOMBIE:
+                    # Process died
+                    log_content = get_last_log_lines(log_path, 15)
+                    
+                    bot.send_message(OWNER_ID,
+                        f"❌ **Bot Crashed!**\n\n"
+                        f"📁 File: `{file_name}`\n"
+                        f"👤 User: `{user_id}`\n"
+                        f"⏱ Uptime: {int((datetime.now() - bot_scripts[script_key]['start_time']).total_seconds())}s\n\n"
+                        f"📜 **Last Logs:**\n```\n{log_content[:1500]}\n```")
+                    
+                    if script_key in bot_scripts:
+                        del bot_scripts[script_key]
+                    break
+                time.sleep(30)
+            except psutil.NoSuchProcess:
+                log_content = get_last_log_lines(log_path, 15)
+                bot.send_message(OWNER_ID,
+                    f"❌ **Bot Process Lost!**\n\n"
+                    f"📁 File: `{file_name}`\n"
+                    f"👤 User: `{user_id}`\n\n"
+                    f"📜 **Last Logs:**\n```\n{log_content[:1500]}\n```")
+                if script_key in bot_scripts:
+                    del bot_scripts[script_key]
+                break
+            except Exception as e:
+                logger.error(f"Monitor error for {script_key}: {e}")
+                time.sleep(30)
+                
+    except Exception as e:
+        logger.error(f"Error in monitor_bot_live for {script_key}: {e}")
 
 def run_js_script(script_path, script_owner_id, user_folder, file_name, message_obj_for_reply, attempt=1):
     max_attempts = 2
@@ -474,55 +675,132 @@ def run_js_script(script_path, script_owner_id, user_folder, file_name, message_
              remove_user_file_db(script_owner_id, file_name)
              return
 
-        logger.info(f"Starting long-running JS process for {script_key}")
+        # CREATE LOG FILE WITH LINE BUFFERING
         log_file_path = os.path.join(user_folder, f"{os.path.splitext(file_name)[0]}.log")
-        log_file = None; process = None
-        try: log_file = open(log_file_path, 'w', encoding='utf-8', errors='ignore')
+        log_file = None
+        process = None
+        
+        try:
+            log_file = open(log_file_path, 'w', encoding='utf-8', errors='ignore', buffering=1)
         except Exception as e:
             logger.error(f"Failed to open log file '{log_file_path}' for JS script {script_key}: {e}", exc_info=True)
             bot.reply_to(message_obj_for_reply, f"❌ Failed to open log file '{log_file_path}': {e}")
             return
+
+        # SETUP ENVIRONMENT
+        env = os.environ.copy()
+        env['NODE_PATH'] = user_folder + os.pathsep + env.get('NODE_PATH', '')
+
+        # START PROCESS
         try:
-            startupinfo = None; creationflags = 0
+            startupinfo = None
+            creationflags = 0
             if os.name == 'nt':
-                 startupinfo = subprocess.STARTUPINFO(); startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                 startupinfo.wShowWindow = subprocess.SW_HIDE
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+                creationflags = subprocess.CREATE_NO_WINDOW
+
+            if sys.platform == 'win32':
+                creationflags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+
             process = subprocess.Popen(
-                ['node', script_path], cwd=user_folder, stdout=log_file, stderr=log_file,
-                stdin=subprocess.PIPE, startupinfo=startupinfo, creationflags=creationflags,
-                encoding='utf-8', errors='ignore'
+                ['node', script_path],
+                cwd=user_folder,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,  # ✅ FIXED
+                startupinfo=startupinfo,
+                creationflags=creationflags if sys.platform == 'win32' else 0,
+                encoding='utf-8',
+                errors='ignore',
+                close_fds=True,
+                shell=False,
+                env=env
             )
-            logger.info(f"Started JS process {process.pid} for {script_key}")
-            bot_scripts[script_key] = {
-                'process': process, 'log_file': log_file, 'file_name': file_name,
-                'chat_id': message_obj_for_reply.chat.id,
-                'script_owner_id': script_owner_id,
-                'start_time': datetime.now(), 'user_folder': user_folder, 'type': 'js', 'script_key': script_key
-            }
-            bot.reply_to(message_obj_for_reply, f"✅ JS script '{file_name}' started! (PID: {process.pid})")
+
+            time.sleep(3)
+
+            if process.poll() is None:
+                logger.info(f"✅ Started JS process {process.pid} for {script_key}")
+                
+                bot_scripts[script_key] = {
+                    'process': process,
+                    'log_file': log_file,
+                    'file_name': file_name,
+                    'chat_id': message_obj_for_reply.chat.id,
+                    'script_owner_id': script_owner_id,
+                    'start_time': datetime.now(),
+                    'user_folder': user_folder,
+                    'type': 'js',
+                    'script_key': script_key,
+                    'log_path': log_file_path
+                }
+                
+                bot.reply_to(message_obj_for_reply, 
+                            f"✅ **JS Script Started Successfully!**\n\n"
+                            f"📁 File: `{file_name}`\n"
+                            f"🆔 PID: `{process.pid}`\n"
+                            f"👤 User: `{script_owner_id}`\n\n"
+                            f"⏳ Bot is initializing...\n"
+                            f"📜 Check logs using control buttons!")
+                
+                threading.Thread(target=monitor_bot_live, args=(script_key, process, log_file_path, file_name, script_owner_id), daemon=True).start()
+                
+            else:
+                error_code = process.poll()
+                log_content = get_last_log_lines(log_file_path, 20)
+                
+                error_hint = ""
+                if "Cannot find module" in log_content:
+                    error_hint = "\n🔧 **Missing Node Module!** Run `npm install` first."
+                elif "SyntaxError" in log_content:
+                    error_hint = "\n🔧 **Syntax Error!** Check your code."
+                
+                bot.reply_to(message_obj_for_reply, 
+                            f"❌ **JS Script Crashed!**\n\n"
+                            f"📁 File: `{file_name}`\n"
+                            f"💀 Return Code: {error_code}\n\n"
+                            f"📜 **Last Logs:**\n```\n{log_content[:1500]}\n```\n{error_hint}")
+                
+                if log_file and not log_file.closed:
+                    log_file.close()
+                if script_key in bot_scripts:
+                    del bot_scripts[script_key]
+                return
+
         except FileNotFoundError:
-             error_msg = "❌ 'node' not found. Ensure Node.js is installed."
-             logger.error(error_msg)
-             if log_file and not log_file.closed: log_file.close()
-             bot.reply_to(message_obj_for_reply, error_msg)
-             if script_key in bot_scripts: del bot_scripts[script_key]
+            error_msg = "❌ 'node' not found. Ensure Node.js is installed."
+            logger.error(error_msg)
+            bot.reply_to(message_obj_for_reply, error_msg)
+            if log_file and not log_file.closed:
+                log_file.close()
+            if script_key in bot_scripts:
+                del bot_scripts[script_key]
         except Exception as e:
-            if log_file and not log_file.closed: log_file.close()
+            if log_file and not log_file.closed:
+                log_file.close()
             error_msg = f"❌ Error starting JS script '{file_name}': {str(e)}"
             logger.error(error_msg, exc_info=True)
             bot.reply_to(message_obj_for_reply, error_msg)
+            
             if process and process.poll() is None:
-                 logger.warning(f"Killing potentially started JS process {process.pid} for {script_key}")
-                 kill_process_tree({'process': process, 'log_file': log_file, 'script_key': script_key})
-            if script_key in bot_scripts: del bot_scripts[script_key]
+                logger.warning(f"Killing potentially started JS process {process.pid} for {script_key}")
+                kill_process_tree({'process': process, 'log_file': log_file, 'script_key': script_key})
+            if script_key in bot_scripts:
+                del bot_scripts[script_key]
+
     except Exception as e:
         error_msg = f"❌ Unexpected error running JS script '{file_name}': {str(e)}"
         logger.error(error_msg, exc_info=True)
         bot.reply_to(message_obj_for_reply, error_msg)
+        
         if script_key in bot_scripts:
-             logger.warning(f"Cleaning up {script_key} due to error in run_js_script.")
-             kill_process_tree(bot_scripts[script_key])
-             del bot_scripts[script_key]
+            logger.warning(f"Cleaning up {script_key} due to error in run_js_script.")
+            kill_process_tree(bot_scripts[script_key])
+            del bot_scripts[script_key]
+
+# =============== DATABASE FUNCTIONS ===============
 
 DB_LOCK = threading.Lock()
 
@@ -658,7 +936,9 @@ def create_main_menu_inline(user_id):
             types.InlineKeyboardButton('👑 Admin Panel', callback_data='admin_panel'),
             types.InlineKeyboardButton('🟢 Run All Scripts', callback_data='run_all_scripts'),
             types.InlineKeyboardButton('📂 Global History', callback_data='global_history'),
-            types.InlineKeyboardButton('⚙️ Free Settings', callback_data='free_settings')
+            types.InlineKeyboardButton('⚙️ Free Settings', callback_data='free_settings'),
+            types.InlineKeyboardButton('🖥️ Bot Manager', callback_data='bot_manager'),
+            types.InlineKeyboardButton('📊 System Stats', callback_data='system_stats')
         ]
         markup.add(buttons[0])
         markup.add(buttons[1], buttons[2])
@@ -667,6 +947,7 @@ def create_main_menu_inline(user_id):
         markup.add(admin_buttons[2], admin_buttons[4])
         markup.add(admin_buttons[3])
         markup.add(admin_buttons[5], admin_buttons[6])
+        markup.add(admin_buttons[7], admin_buttons[8])
         markup.add(buttons[5], buttons[6])
         markup.add(buttons[7])
     else:
@@ -723,7 +1004,22 @@ def create_admin_panel():
     markup.row(types.InlineKeyboardButton('⚙️ Free Settings', callback_data='free_settings'))
     markup.row(types.InlineKeyboardButton('📂 Global History', callback_data='global_history'))
     markup.row(types.InlineKeyboardButton('💲 Price List', callback_data='price_list'))
+    markup.row(types.InlineKeyboardButton('🖥️ Bot Manager', callback_data='bot_manager'))
+    markup.row(types.InlineKeyboardButton('📊 System Stats', callback_data='system_stats'))
     markup.row(types.InlineKeyboardButton('🔙 Back to Main', callback_data='back_to_main'))
+    return markup
+
+def create_bot_manager():
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.row(
+        types.InlineKeyboardButton('📋 List All Bots', callback_data='list_all_bots'),
+        types.InlineKeyboardButton('🔄 Auto-Restart Toggle', callback_data='toggle_auto_restart')
+    )
+    markup.row(
+        types.InlineKeyboardButton('📊 System Stats', callback_data='system_stats'),
+        types.InlineKeyboardButton('🗑️ Clean Dead Bots', callback_data='clean_dead_bots')
+    )
+    markup.row(types.InlineKeyboardButton('🔙 Back to Admin', callback_data='admin_panel'))
     return markup
 
 def create_subscription_menu():
@@ -964,7 +1260,8 @@ def show_price_list(chat_id, message_id=None):
     if message_id:
         try:
             bot.edit_message_text(text, chat_id, message_id, reply_markup=markup, parse_mode='Markdown')
-        except:
+        except Exception as e:
+            logger.error(f"Error editing price list: {e}")
             bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
     else:
         bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
@@ -995,7 +1292,8 @@ def show_prime_plans(chat_id, message_id):
     
     try:
         bot.edit_message_text(text, chat_id, message_id, reply_markup=create_prime_plans(), parse_mode='Markdown')
-    except:
+    except Exception as e:
+        logger.error(f"Error showing prime plans: {e}")
         bot.send_message(chat_id, text, reply_markup=create_prime_plans(), parse_mode='Markdown')
 
 def show_vip_plans(chat_id, message_id):
@@ -1023,7 +1321,8 @@ def show_vip_plans(chat_id, message_id):
     
     try:
         bot.edit_message_text(text, chat_id, message_id, reply_markup=create_vip_plans(), parse_mode='Markdown')
-    except:
+    except Exception as e:
+        logger.error(f"Error showing vip plans: {e}")
         bot.send_message(chat_id, text, reply_markup=create_vip_plans(), parse_mode='Markdown')
 
 def show_plan_details(chat_id, message_id, plan_type, plan_name, days, price, qr_url):
@@ -1209,6 +1508,30 @@ def add_vip_to_user(user_id, days):
         bot.send_message(OWNER_ID, f"✅ VIP added to user {user_id} for {days} days!")
     except:
         pass
+
+# =============== SYSTEM STATS ===============
+
+def get_system_stats():
+    try:
+        cpu_percent = psutil.cpu_percent(interval=0.5)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        
+        stats = {
+            'cpu': cpu_percent,
+            'memory_total': memory.total / (1024**3),
+            'memory_used': memory.used / (1024**3),
+            'memory_percent': memory.percent,
+            'disk_total': disk.total / (1024**3),
+            'disk_used': disk.used / (1024**3),
+            'disk_percent': disk.percent,
+            'running_bots': len(bot_scripts),
+            'total_users': len(active_users)
+        }
+        return stats
+    except Exception as e:
+        logger.error(f"Error getting system stats: {e}")
+        return None
 
 # =============== LOGIC FUNCTIONS ===============
 
@@ -1443,6 +1766,102 @@ def _logic_statistics(message):
 
     bot.reply_to(message, stats_msg, parse_mode='Markdown')
 
+def _logic_system_stats(message):
+    if message.from_user.id not in admin_ids:
+        bot.reply_to(message, "👑 Admin permissions required.")
+        return
+    
+    stats = get_system_stats()
+    if stats:
+        text = f"""📊 **System Statistics** 📊
+
+💻 **CPU:** {stats['cpu']}%
+🧠 **Memory:** {stats['memory_used']:.1f}GB / {stats['memory_total']:.1f}GB ({stats['memory_percent']}%)
+💾 **Disk:** {stats['disk_used']:.1f}GB / {stats['disk_total']:.1f}GB ({stats['disk_percent']}%)
+
+🤖 **Running Bots:** {stats['running_bots']}
+👥 **Total Users:** {stats['total_users']}
+
+⏱ **Uptime:** {get_uptime()}"""
+        bot.reply_to(message, text, parse_mode='Markdown')
+    else:
+        bot.reply_to(message, "❌ Failed to get system statistics.")
+
+def _logic_bot_manager(message):
+    if message.from_user.id not in admin_ids:
+        bot.reply_to(message, "👑 Admin permissions required.")
+        return
+    bot.reply_to(message, "🖥️ **Bot Manager**\nManage all hosted bots.", reply_markup=create_bot_manager(), parse_mode='Markdown')
+
+def _logic_list_all_bots(message):
+    if message.from_user.id not in admin_ids:
+        bot.reply_to(message, "👑 Admin permissions required.")
+        return
+    
+    if not bot_scripts:
+        bot.reply_to(message, "📋 No bots are currently running.")
+        return
+    
+    text = "📋 **All Running Bots:**\n\n"
+    for script_key, script_info in bot_scripts.items():
+        owner_id = script_info.get('script_owner_id', 'Unknown')
+        file_name = script_info.get('file_name', 'Unknown')
+        pid = script_info.get('process', {}).pid if script_info.get('process') else 'N/A'
+        start_time = script_info.get('start_time', datetime.now())
+        uptime = datetime.now() - start_time
+        hours, remainder = divmod(uptime.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        
+        text += f"📁 `{file_name}`\n"
+        text += f"👤 User: `{owner_id}`\n"
+        text += f"🆔 PID: `{pid}`\n"
+        text += f"⏱ Uptime: {hours}h {minutes}m {seconds}s\n\n"
+    
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("🔙 Back to Bot Manager", callback_data='bot_manager'))
+    bot.reply_to(message, text, reply_markup=markup, parse_mode='Markdown')
+
+def _logic_toggle_auto_restart(message):
+    if message.from_user.id not in admin_ids:
+        bot.reply_to(message, "👑 Admin permissions required.")
+        return
+    
+    settings = get_bot_settings()
+    current = settings.get('auto_restart', 'True')
+    new_value = 'False' if current.lower() == 'true' else 'True'
+    
+    with DB_LOCK:
+        conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+        c = conn.cursor()
+        c.execute('UPDATE bot_settings SET setting_value = ? WHERE setting_key = ?', (new_value, 'auto_restart'))
+        conn.commit()
+        conn.close()
+    
+    status = "✅ Enabled" if new_value == 'True' else "❌ Disabled"
+    bot.reply_to(message, f"🔄 Auto-Restart: {status}")
+
+def _logic_clean_dead_bots(message):
+    if message.from_user.id not in admin_ids:
+        bot.reply_to(message, "👑 Admin permissions required.")
+        return
+    
+    cleaned = 0
+    for script_key, script_info in list(bot_scripts.items()):
+        process = script_info.get('process')
+        if process:
+            try:
+                proc = psutil.Process(process.pid)
+                if not proc.is_running() or proc.status() == psutil.STATUS_ZOMBIE:
+                    del bot_scripts[script_key]
+                    cleaned += 1
+            except psutil.NoSuchProcess:
+                del bot_scripts[script_key]
+                cleaned += 1
+            except Exception as e:
+                logger.error(f"Error cleaning {script_key}: {e}")
+    
+    bot.reply_to(message, f"🧹 Cleaned {cleaned} dead bot(s)!")
+
 def _logic_broadcast_init(message):
     if message.from_user.id not in admin_ids:
         bot.reply_to(message, "👑 Admin permissions required.")
@@ -1630,12 +2049,10 @@ def ping(message):
 
 @bot.message_handler(commands=['price'])
 def price_command(message):
-    """Public Price List Command"""
     show_price_list(message.chat.id)
 
 @bot.message_handler(func=lambda message: message.text == "💲 Price List")
 def price_list_button_handler(message):
-    """Handle Price List button from keyboard"""
     show_price_list(message.chat.id)
 
 @bot.message_handler(commands=['admin'])
@@ -1651,7 +2068,8 @@ def admin_commands(message):
                              "/admin ban <id> - Ban user\n"
                              "/admin unban <id> - Unban user\n"
                              "/admin host <id> <time> <files> - Add hosting\n"
-                             "/admin remove <id> - Remove user's hosting")
+                             "/admin remove <id> - Remove user's hosting\n"
+                             "/admin stats - System stats")
         return
     command = args[1].lower()
     user_id = int(args[2]) if len(args) > 2 else None
@@ -1697,12 +2115,18 @@ def admin_commands(message):
             return
         remove_hosting(user_id)
         bot.reply_to(message, f"✅ Removed hosting for user {user_id}.")
+    elif command == "stats":
+        _logic_system_stats(message)
     else:
-        bot.reply_to(message, "❌ Invalid admin command. Use prime, vip, ban, unban, host, remove.")
+        bot.reply_to(message, "❌ Invalid admin command. Use prime, vip, ban, unban, host, remove, stats.")
 
 @bot.message_handler(commands=['globalhistory'])
 def global_file_history(message):
     _logic_global_history(message)
+
+@bot.message_handler(commands=['botmanager'])
+def bot_manager(message):
+    _logic_bot_manager(message)
 
 BUTTON_TEXT_TO_LOGIC = {
     "📢 Updates Channel": _logic_updates_channel,
@@ -1719,7 +2143,9 @@ BUTTON_TEXT_TO_LOGIC = {
     "👑 Admin Panel": _logic_admin_panel,
     "🤖 MPX AI": lambda m: handle_mpx_command(m),
     "💲 Price List": lambda m: show_price_list(m.chat.id),
-    "📂 Global History": _logic_global_history
+    "📂 Global History": _logic_global_history,
+    "🖥️ Bot Manager": _logic_bot_manager,
+    "📊 System Stats": _logic_system_stats
 }
 
 @bot.message_handler(func=lambda message: message.text in BUTTON_TEXT_TO_LOGIC)
@@ -1967,6 +2393,27 @@ def handle_callbacks(call):
                                 f"Please contact admin: {YOUR_USERNAME}", parse_mode='Markdown')
             except:
                 pass
+            return
+
+        # =============== BOT MANAGER CALLBACKS ===============
+        elif data == 'bot_manager':
+            admin_required_callback(call, _logic_bot_manager)
+            return
+        
+        elif data == 'list_all_bots':
+            admin_required_callback(call, _logic_list_all_bots)
+            return
+        
+        elif data == 'toggle_auto_restart':
+            admin_required_callback(call, _logic_toggle_auto_restart)
+            return
+        
+        elif data == 'clean_dead_bots':
+            admin_required_callback(call, _logic_clean_dead_bots)
+            return
+        
+        elif data == 'system_stats':
+            admin_required_callback(call, _logic_system_stats)
             return
 
         # =============== FILE MANAGEMENT CALLBACKS ===============
@@ -2505,22 +2952,18 @@ def logs_bot_callback(call):
 
         bot.answer_callback_query(call.id)
         try:
-            log_content = ""; file_size = os.path.getsize(log_path)
-            max_log_kb = 100; max_tg_msg = 4096
-            if file_size == 0: log_content = "(Log empty)"
-            elif file_size > max_log_kb * 1024:
-                 with open(log_path, 'rb') as f: f.seek(-max_log_kb * 1024, os.SEEK_END); log_bytes = f.read()
-                 log_content = log_bytes.decode('utf-8', errors='ignore')
-                 log_content = f"(Last {max_log_kb} KB)\n...\n" + log_content
-            else:
-                 with open(log_path, 'r', encoding='utf-8', errors='ignore') as f: log_content = f.read()
-
-            if len(log_content) > max_tg_msg:
-                log_content = log_content[-max_tg_msg:]
+            log_content = get_last_log_lines(log_path, 50)
+            
+            if len(log_content) > 4000:
+                log_content = log_content[-4000:]
                 first_nl = log_content.find('\n')
-                if first_nl != -1: log_content = "...\n" + log_content[first_nl+1:]
-                else: log_content = "...\n" + log_content
-            if not log_content.strip(): log_content = "(No visible content)"
+                if first_nl != -1:
+                    log_content = "...\n" + log_content[first_nl+1:]
+                else:
+                    log_content = "...\n" + log_content
+            
+            if not log_content.strip():
+                log_content = "(No visible content)"
 
             bot.send_message(chat_id_for_reply, 
                             f"📜 **Logs for:** `{file_name}` (User `{script_owner_id}`)\n```\n{log_content}\n```", 
@@ -3205,7 +3648,7 @@ def cleanup():
 atexit.register(cleanup)
 
 if __name__ == '__main__':
-    logger.info("="*40 + "\n🌟 BRONX ULTRA OSINT BOT v11.0 🌟\n" + 
+    logger.info("="*40 + "\n🌟 BRONX ULTRA OSINT BOT v15.0 🌟\n" + 
                 f"🐍 Python: {sys.version.split()[0]}\n" +
                 f"📁 Base Dir: {BASE_DIR}\n" +
                 f"📂 Upload Dir: {UPLOAD_BOTS_DIR}\n" +
