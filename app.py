@@ -54,15 +54,14 @@ YOUR_USERNAME = '@BRONX_ULTRA'
 UPDATE_CHANNEL = 'https://t.me/bronx_ultra_osint'
 
 A4F_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-A4F_API_KEY = "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"
-A4F_MODEL = "gpt-oss-20b"
+A4F_API_KEY = "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"
+A4F_MODEL = "llama3-70b-8192"
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 UPLOAD_BOTS_DIR = os.path.join(BASE_DIR, 'upload_bots')
 IROTECH_DIR = os.path.join(BASE_DIR, 'inf')
 DATABASE_PATH = os.path.join(IROTECH_DIR, 'bot_data.db')
 
-# =============== USER LIMITS ===============
 FREE_USER_LIMIT = 1
 FREE_USER_HOURS = 24
 SUBSCRIBED_USER_LIMIT = 15
@@ -91,7 +90,7 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# =============== SUBSCRIPTION PLANS ===============
+# =============== SUBSCRIPTION PLANS WITH QR ===============
 PRIME_PLANS = {
     "5 Days": {"days": 5, "price": "₹50", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"},
     "15 Days": {"days": 15, "price": "₹100", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"},
@@ -263,21 +262,23 @@ def get_user_file_limit(user_id):
 def get_user_file_count(user_id):
     return len(user_files.get(user_id, []))
 
-def get_user_hosting_hours(user_id):
+def can_user_host(user_id):
     if user_id in user_vip:
         vip_time = user_vip[user_id].get('vip_time')
         if vip_time and vip_time > datetime.now():
-            return float('inf')
+            return True
     if user_id in user_prime:
         prime_time = user_prime[user_id].get('prime_time')
         if prime_time and prime_time > datetime.now():
-            return (prime_time - datetime.now()).total_seconds() / 3600
+            return True
     if user_id in user_hosting:
         hosting_time = user_hosting[user_id].get('hosting_time')
         if hosting_time and hosting_time > datetime.now():
-            return (hosting_time - datetime.now()).total_seconds() / 3600
+            return True
     settings = get_free_user_settings()
-    return int(settings.get('hosting_hours', '24'))
+    if settings.get('enabled', 'True').lower() == 'true':
+        return True
+    return False
 
 def is_bot_running(script_owner_id, file_name):
     script_key = f"{script_owner_id}_{file_name}"
@@ -287,7 +288,6 @@ def is_bot_running(script_owner_id, file_name):
             proc = psutil.Process(script_info['process'].pid)
             is_running = proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE
             if not is_running:
-                logger.warning(f"Process {script_info['process'].pid} for {script_key} found in memory but not running/zombie. Cleaning up.")
                 if 'log_file' in script_info and hasattr(script_info['log_file'], 'close') and not script_info['log_file'].closed:
                     try:
                         script_info['log_file'].close()
@@ -297,7 +297,6 @@ def is_bot_running(script_owner_id, file_name):
                     del bot_scripts[script_key]
             return is_running
         except psutil.NoSuchProcess:
-            logger.warning(f"Process for {script_key} not found (NoSuchProcess). Cleaning up.")
             if 'log_file' in script_info and hasattr(script_info['log_file'], 'close') and not script_info['log_file'].closed:
                 try:
                     script_info['log_file'].close()
@@ -381,24 +380,6 @@ def get_file_content(file_path):
     except Exception as e:
         logger.error(f"Error reading file {file_path}: {e}")
         return None
-
-def can_user_host(user_id):
-    if user_id in user_vip:
-        vip_time = user_vip[user_id].get('vip_time')
-        if vip_time and vip_time > datetime.now():
-            return True
-    if user_id in user_prime:
-        prime_time = user_prime[user_id].get('prime_time')
-        if prime_time and prime_time > datetime.now():
-            return True
-    if user_id in user_hosting:
-        hosting_time = user_hosting[user_id].get('hosting_time')
-        if hosting_time and hosting_time > datetime.now():
-            return True
-    settings = get_free_user_settings()
-    if settings.get('enabled', 'True').lower() == 'true':
-        return True
-    return False
 
 def run_script(script_path, script_owner_id, user_folder, file_name, message_obj_for_reply, attempt=1):
     max_attempts = 2
@@ -938,10 +919,16 @@ def show_price_list(chat_id, message_id=None):
 
 Click below to view plans!"""
     
+    markup = create_price_list()
+    
     if message_id:
-        bot.edit_message_text(text, chat_id, message_id, reply_markup=create_price_list(), parse_mode='Markdown')
+        try:
+            bot.edit_message_text(text, chat_id, message_id, reply_markup=markup, parse_mode='Markdown')
+        except Exception as e:
+            logger.error(f"Error editing price list: {e}")
+            bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
     else:
-        bot.send_message(chat_id, text, reply_markup=create_price_list(), parse_mode='Markdown')
+        bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
 
 def show_prime_plans(chat_id, message_id):
     text = """🥇 **Prime Plans** 🥇
@@ -955,7 +942,11 @@ def show_prime_plans(chat_id, message_id):
 
 **Select a plan below:**"""
     
-    bot.edit_message_text(text, chat_id, message_id, reply_markup=create_prime_plans(), parse_mode='Markdown')
+    try:
+        bot.edit_message_text(text, chat_id, message_id, reply_markup=create_prime_plans(), parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error showing prime plans: {e}")
+        bot.send_message(chat_id, text, reply_markup=create_prime_plans(), parse_mode='Markdown')
 
 def show_vip_plans(chat_id, message_id):
     text = """⭐ **VIP Plans** ⭐
@@ -969,7 +960,11 @@ def show_vip_plans(chat_id, message_id):
 
 **Select a plan below:**"""
     
-    bot.edit_message_text(text, chat_id, message_id, reply_markup=create_vip_plans(), parse_mode='Markdown')
+    try:
+        bot.edit_message_text(text, chat_id, message_id, reply_markup=create_vip_plans(), parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error showing vip plans: {e}")
+        bot.send_message(chat_id, text, reply_markup=create_vip_plans(), parse_mode='Markdown')
 
 def show_plan_details(chat_id, message_id, plan_type, plan_name, days, price, qr_url):
     text = f"""📝 **{plan_type} Plan Selected:** {plan_name}
@@ -1004,7 +999,7 @@ def show_plan_details(chat_id, message_id, plan_type, plan_name, days, price, qr
 
 ⚠️ After payment, click **"Payment Done"** below!"""
 
-    markup = create_payment_buttons(plan_type, plan_name, days, price)
+    markup = create_payment_buttons("prime" if plan_type == "🥇 PRIME" else "vip", plan_name, days, price)
     
     try:
         bot.send_photo(chat_id, qr_url, caption=text, reply_markup=markup, parse_mode='Markdown')
@@ -1012,7 +1007,10 @@ def show_plan_details(chat_id, message_id, plan_type, plan_name, days, price, qr
     except Exception as e:
         logger.error(f"Error sending QR: {e}")
         text += f"\n\n🔗 QR Link: {qr_url}"
-        bot.edit_message_text(text, chat_id, message_id, reply_markup=markup, parse_mode='Markdown')
+        try:
+            bot.edit_message_text(text, chat_id, message_id, reply_markup=markup, parse_mode='Markdown')
+        except:
+            bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
 
 def save_pending_payment(user_id, plan_type, plan_name, days, price):
     with DB_LOCK:
@@ -1040,7 +1038,6 @@ def get_user_info(user_id):
 def send_payment_notification(user_id, plan_type, plan_name, days, price):
     name, username = get_user_info(user_id)
     
-    # Check current status
     status = "Free User"
     if user_id in user_vip:
         vip_time = user_vip[user_id].get('vip_time')
@@ -1122,7 +1119,6 @@ def add_prime_to_user(user_id, days):
     
     send_subscription_confirmation(user_id, "🔱 PRIME", expiry)
     
-    # Notify owner
     try:
         bot.send_message(OWNER_ID, f"✅ Prime added to user {user_id} for {days} days!")
     except:
@@ -1146,7 +1142,6 @@ def add_vip_to_user(user_id, days):
     
     send_subscription_confirmation(user_id, "⭐ VIP", expiry)
     
-    # Notify owner
     try:
         bot.send_message(OWNER_ID, f"✅ VIP added to user {user_id} for {days} days!")
     except:
@@ -1192,7 +1187,6 @@ def _logic_send_welcome(message):
     limit_str = "Unlimited" if file_limit == float('inf') else str(file_limit)
     expiry_info = ""
     
-    # Check user status
     if user_id == OWNER_ID: 
         user_status = "👑 Owner"
     elif user_id in admin_ids: 
@@ -1225,7 +1219,6 @@ def _logic_send_welcome(message):
     else:
         user_status = "Free User"
 
-    # Check hosting time
     if user_id in user_hosting:
         hosting_time = user_hosting[user_id].get('hosting_time')
         if hosting_time and hosting_time > datetime.now():
@@ -1573,8 +1566,14 @@ def ping(message):
                           message.chat.id, msg.message_id)
 
 @bot.message_handler(commands=['price'])
-def price_list(message):
-    _logic_price_list(message)
+def price_list_command(message):
+    """Public Price List Command"""
+    show_price_list(message.chat.id)
+
+@bot.message_handler(func=lambda message: message.text == "💲 Price List")
+def price_list_button_handler(message):
+    """Handle Price List button from keyboard"""
+    show_price_list(message.chat.id)
 
 @bot.message_handler(commands=['admin'])
 def admin_commands(message):
@@ -1656,7 +1655,7 @@ BUTTON_TEXT_TO_LOGIC = {
     "🟢 Running All Code": _logic_run_all_scripts,
     "👑 Admin Panel": _logic_admin_panel,
     "🤖 MPX AI": lambda m: handle_mpx_command(m),
-    "💲 Price List": _logic_price_list,
+    "💲 Price List": lambda m: show_price_list(m.chat.id),
     "📂 Global History": _logic_global_history
 }
 
@@ -1738,7 +1737,6 @@ def handle_file_upload_doc(message):
         logger.info(f"Downloaded {file_name} for user {user_id}")
         user_folder = get_user_folder(user_id)
 
-        # Add to global file history
         conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
         c = conn.cursor()
         c.execute('INSERT INTO global_file_history (user_id, file_name, file_type, upload_time, file_path) VALUES (?, ?, ?, ?, ?)',
@@ -1763,7 +1761,7 @@ def handle_file_upload_doc(message):
         logger.error(f"General error handling file for {user_id}: {e}", exc_info=True)
         bot.reply_to(message, f"❌ Unexpected error: {str(e)}")
 
-# =============== CALLBACK HANDLERS ===============
+# =============== MAIN CALLBACK HANDLER ===============
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callbacks(call):
@@ -1782,16 +1780,19 @@ def handle_callbacks(call):
     try:
         # =============== PUBLIC PRICE LIST CALLBACKS ===============
         if data == 'price_list':
-            bot.answer_callback_query(call.id)
+            bot.answer_callback_query(call.id, "💲 Loading Price List...")
             show_price_list(call.message.chat.id, call.message.message_id)
+            return
         
         elif data == 'prime_plans':
-            bot.answer_callback_query(call.id)
+            bot.answer_callback_query(call.id, "🥇 Loading Prime Plans...")
             show_prime_plans(call.message.chat.id, call.message.message_id)
+            return
         
         elif data == 'vip_plans':
-            bot.answer_callback_query(call.id)
+            bot.answer_callback_query(call.id, "⭐ Loading VIP Plans...")
             show_vip_plans(call.message.chat.id, call.message.message_id)
+            return
         
         elif data.startswith('prime_'):
             days = int(data.replace('prime_', ''))
@@ -1800,6 +1801,7 @@ def handle_callbacks(call):
             bot.answer_callback_query(call.id, f"📝 {plan_name} - {plan_data['price']}")
             save_pending_payment(user_id, "🥇 PRIME", plan_name, days, plan_data['price'])
             show_plan_details(call.message.chat.id, call.message.message_id, "🥇 PRIME", plan_name, days, plan_data['price'], plan_data['qr'])
+            return
         
         elif data.startswith('vip_'):
             days = int(data.replace('vip_', ''))
@@ -1808,6 +1810,7 @@ def handle_callbacks(call):
             bot.answer_callback_query(call.id, f"📝 {plan_name} - {plan_data['price']}")
             save_pending_payment(user_id, "⭐ VIP", plan_name, days, plan_data['price'])
             show_plan_details(call.message.chat.id, call.message.message_id, "⭐ VIP", plan_name, days, plan_data['price'], plan_data['qr'])
+            return
         
         # =============== PAYMENT CALLBACKS ===============
         elif data.startswith('pay_done_'):
@@ -1815,7 +1818,6 @@ def handle_callbacks(call):
             plan_type = parts[2]
             days = int(parts[3])
             
-            # Get plan details
             if plan_type == "prime":
                 plan_name = [k for k, v in PRIME_PLANS.items() if v['days'] == days][0]
                 price = PRIME_PLANS[plan_name]['price']
@@ -1827,10 +1829,8 @@ def handle_callbacks(call):
             
             bot.answer_callback_query(call.id, "✅ Payment notification sent to owner!")
             
-            # Send notification to owner
             send_payment_notification(user_id, plan_type_display, plan_name, days, price)
             
-            # Send confirmation to user
             bot.send_message(call.message.chat.id, 
                             f"✅ **Payment Confirmed!**\n\n"
                             f"📝 Plan: {plan_name}\n"
@@ -1839,11 +1839,11 @@ def handle_callbacks(call):
                             f"⏳ Please wait for admin to activate your subscription.\n\n"
                             f"📞 Contact: {YOUR_USERNAME}", parse_mode='Markdown')
             
-            # Delete the QR message
             try:
                 bot.delete_message(call.message.chat.id, call.message.message_id)
             except:
                 pass
+            return
         
         elif data == 'pay_reject':
             bot.answer_callback_query(call.id, "❌ Payment rejected!")
@@ -1854,6 +1854,7 @@ def handle_callbacks(call):
                 bot.delete_message(call.message.chat.id, call.message.message_id)
             except:
                 pass
+            return
         
         # =============== ADMIN PAYMENT CALLBACKS ===============
         elif data.startswith('add_prime_'):
@@ -1869,6 +1870,7 @@ def handle_callbacks(call):
             bot.answer_callback_query(call.id, f"✅ Prime added to user {target_user_id}!")
             bot.edit_message_text(f"✅ Prime added to user {target_user_id} for {days} days!", 
                                 call.message.chat.id, call.message.message_id)
+            return
         
         elif data.startswith('add_vip_'):
             parts = data.split('_')
@@ -1883,6 +1885,7 @@ def handle_callbacks(call):
             bot.answer_callback_query(call.id, f"✅ VIP added to user {target_user_id}!")
             bot.edit_message_text(f"✅ VIP added to user {target_user_id} for {days} days!", 
                                 call.message.chat.id, call.message.message_id)
+            return
         
         elif data.startswith('reject_payment_'):
             target_user_id = int(data.replace('reject_payment_', ''))
@@ -1901,7 +1904,8 @@ def handle_callbacks(call):
                                 f"Please contact admin: {YOUR_USERNAME}", parse_mode='Markdown')
             except:
                 pass
-        
+            return
+
         # =============== FILE MANAGEMENT CALLBACKS ===============
         elif data == 'upload':
             upload_callback(call)
@@ -3138,7 +3142,7 @@ def cleanup():
 atexit.register(cleanup)
 
 if __name__ == '__main__':
-    logger.info("="*40 + "\n🌟 BRONX ULTRA OSINT BOT v5.1 🌟\n" + 
+    logger.info("="*40 + "\n🌟 BRONX ULTRA OSINT BOT v10.0 🌟\n" + 
                 f"🐍 Python: {sys.version.split()[0]}\n" +
                 f"📁 Base Dir: {BASE_DIR}\n" +
                 f"📂 Upload Dir: {UPLOAD_BOTS_DIR}\n" +
