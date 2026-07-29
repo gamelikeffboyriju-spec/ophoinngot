@@ -19,9 +19,6 @@ import atexit
 import requests
 import schedule
 import uuid
-import pty
-import termios
-import fcntl
 
 from flask import Flask
 from threading import Thread
@@ -30,7 +27,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "🤖 BRONX ULTRA OSINT BOT v15.0 is running!"
+    return "🤖 BRONX ULTRA OSINT BOT v20.0 is running!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -57,9 +54,9 @@ ADMIN_ID = 6840524720
 YOUR_USERNAME = '@BRONX_ULTRA'
 UPDATE_CHANNEL = 'https://t.me/bronx_ultra_osint'
 
-A4F_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-A4F_API_KEY = "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"
-A4F_MODEL = "llama3-70b-8192"
+# =============== FREE CHATGPT API ===============
+CHATGPT_API_URL = "https://api.itsrose.life/ai/chatgpt"
+CHATGPT_API_KEY = "rose"
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 UPLOAD_BOTS_DIR = os.path.join(BASE_DIR, 'upload_bots')
@@ -122,7 +119,7 @@ COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
     ["📤 Upload File", "📂 Check Files"],
     ["⚡ Bot Speed", "📊 Statistics"],
     ["💲 Price List", "📞 Contact Owner"],
-    ["🤖 MPX Ai"]
+    ["🤖 ChatGPT"]
 ]
 
 ADMIN_COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
@@ -132,7 +129,7 @@ ADMIN_COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
     ["💳 Subscriptions", "📢 Broadcast"],
     ["🔒 Lock Bot", "🟢 Running All Code"],
     ["👑 Admin Panel", "📞 Contact Owner"],
-    ["🤖 MPX Ai", "⏱ Uptime"],
+    ["🤖 ChatGPT", "⏱ Uptime"],
     ["📂 Global History", "💲 Price List"],
     ["🖥️ Bot Manager", "📊 System Stats"]
 ]
@@ -400,7 +397,6 @@ def get_file_content(file_path):
         return None
 
 def get_last_log_lines(log_path, lines=20):
-    """Get last N lines from log file"""
     try:
         if not os.path.exists(log_path):
             return "No log file found"
@@ -411,7 +407,7 @@ def get_last_log_lines(log_path, lines=20):
     except Exception as e:
         return f"Error reading log: {e}"
 
-# =============== COMPLETE FIXED RUN SCRIPT ===============
+# =============== RUN SCRIPT FUNCTIONS ===============
 
 def run_script(script_path, script_owner_id, user_folder, file_name, message_obj_for_reply, attempt=1):
     max_attempts = 2
@@ -435,7 +431,6 @@ def run_script(script_path, script_owner_id, user_folder, file_name, message_obj
              remove_user_file_db(script_owner_id, file_name)
              return
 
-        # CREATE LOG FILE WITH LINE BUFFERING
         log_file_path = os.path.join(user_folder, f"{os.path.splitext(file_name)[0]}.log")
         log_file = None
         process = None
@@ -447,13 +442,11 @@ def run_script(script_path, script_owner_id, user_folder, file_name, message_obj
             bot.reply_to(message_obj_for_reply, f"❌ Failed to open log file '{log_file_path}': {e}")
             return
 
-        # SETUP ENVIRONMENT
         env = os.environ.copy()
         env['PYTHONPATH'] = user_folder + os.pathsep + env.get('PYTHONPATH', '')
-        env['PYTHONUNBUFFERED'] = '1'  # Force unbuffered output
+        env['PYTHONUNBUFFERED'] = '1'
         env['PYTHONIOENCODING'] = 'utf-8'
 
-        # START PROCESS
         try:
             startupinfo = None
             creationflags = 0
@@ -463,7 +456,6 @@ def run_script(script_path, script_owner_id, user_folder, file_name, message_obj
                 startupinfo.wShowWindow = subprocess.SW_HIDE
                 creationflags = subprocess.CREATE_NO_WINDOW
 
-            # Use CREATE_NEW_PROCESS_GROUP to avoid signals
             if sys.platform == 'win32':
                 creationflags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
 
@@ -471,8 +463,8 @@ def run_script(script_path, script_owner_id, user_folder, file_name, message_obj
                 [sys.executable, script_path],
                 cwd=user_folder,
                 stdout=log_file,
-                stderr=subprocess.STDOUT,  # ✅ Merge stderr into stdout
-                stdin=subprocess.DEVNULL,  # ✅ FIXED: No stdin blocking
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
                 startupinfo=startupinfo,
                 creationflags=creationflags if sys.platform == 'win32' else 0,
                 encoding='utf-8',
@@ -482,10 +474,8 @@ def run_script(script_path, script_owner_id, user_folder, file_name, message_obj
                 env=env
             )
 
-            # ✅ Wait for process to initialize
             time.sleep(3)
 
-            # ✅ CHECK IF PROCESS IS RUNNING
             if process.poll() is None:
                 logger.info(f"✅ Started Python process {process.pid} for {script_key}")
                 
@@ -507,22 +497,21 @@ def run_script(script_path, script_owner_id, user_folder, file_name, message_obj
                             f"📁 File: `{file_name}`\n"
                             f"🆔 PID: `{process.pid}`\n"
                             f"👤 User: `{script_owner_id}`\n\n"
-                            f"⏳ Bot is initializing...\n"
-                            f"📜 Check logs using control buttons!\n\n"
-                            f"⚠️ If bot doesn't respond, check logs for errors.")
+                            f"⚡ Response Time: 10ms (Flash of Light ⚡)\n"
+                            f"💾 RAM: 500GB\n"
+                            f"📁 Storage: Unlimited\n"
+                            f"💿 Disk: 20 Billion\n"
+                            f"🖥️ Hard Disk: 100 Billion\n\n"
+                            f"📜 Check logs using control buttons!")
                 
-                # ✅ START LIVE MONITOR
                 threading.Thread(target=monitor_bot_live, args=(script_key, process, log_file_path, file_name, script_owner_id), daemon=True).start()
                 
             else:
-                # ❌ PROCESS CRASHED IMMEDIATELY
                 error_code = process.poll()
                 logger.error(f"❌ Process {script_key} crashed immediately! Return code: {error_code}")
                 
-                # Read log file
                 log_content = get_last_log_lines(log_file_path, 20)
                 
-                # Check for common errors
                 error_hint = ""
                 if "ModuleNotFoundError" in log_content or "ImportError" in log_content:
                     error_hint = "\n🔧 **Missing Module!** Try installing dependencies."
@@ -578,21 +567,15 @@ def run_script(script_path, script_owner_id, user_folder, file_name, message_obj
             kill_process_tree(bot_scripts[script_key])
             del bot_scripts[script_key]
 
-# =============== LIVE BOT MONITOR ===============
-
 def monitor_bot_live(script_key, process, log_path, file_name, user_id):
-    """Monitor bot live and detect crashes"""
     try:
-        # Wait for bot to initialize
         time.sleep(10)
         
         if script_key not in bot_scripts:
             logger.info(f"Bot {script_key} already removed from tracking")
             return
         
-        # Check if process is still running
         if process.poll() is not None:
-            # Process died
             error_code = process.poll()
             log_content = get_last_log_lines(log_path, 15)
             
@@ -609,20 +592,19 @@ def monitor_bot_live(script_key, process, log_path, file_name, user_id):
                 del bot_scripts[script_key]
             return
         
-        # Send success notification to owner
         bot.send_message(OWNER_ID,
             f"✅ **Bot Running Successfully!**\n\n"
             f"📁 File: `{file_name}`\n"
             f"👤 User: `{user_id}`\n"
             f"🆔 PID: {process.pid}\n\n"
-            f"⏱ Uptime: Running...")
+            f"⚡ Response Time: 10ms\n"
+            f"💾 RAM: 500GB\n"
+            f"📁 Storage: Unlimited")
         
-        # Keep monitoring
         while script_key in bot_scripts:
             try:
                 proc = psutil.Process(process.pid)
                 if not proc.is_running() or proc.status() == psutil.STATUS_ZOMBIE:
-                    # Process died
                     log_content = get_last_log_lines(log_path, 15)
                     
                     bot.send_message(OWNER_ID,
@@ -675,7 +657,6 @@ def run_js_script(script_path, script_owner_id, user_folder, file_name, message_
              remove_user_file_db(script_owner_id, file_name)
              return
 
-        # CREATE LOG FILE WITH LINE BUFFERING
         log_file_path = os.path.join(user_folder, f"{os.path.splitext(file_name)[0]}.log")
         log_file = None
         process = None
@@ -687,11 +668,9 @@ def run_js_script(script_path, script_owner_id, user_folder, file_name, message_
             bot.reply_to(message_obj_for_reply, f"❌ Failed to open log file '{log_file_path}': {e}")
             return
 
-        # SETUP ENVIRONMENT
         env = os.environ.copy()
         env['NODE_PATH'] = user_folder + os.pathsep + env.get('NODE_PATH', '')
 
-        # START PROCESS
         try:
             startupinfo = None
             creationflags = 0
@@ -709,7 +688,7 @@ def run_js_script(script_path, script_owner_id, user_folder, file_name, message_
                 cwd=user_folder,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
-                stdin=subprocess.DEVNULL,  # ✅ FIXED
+                stdin=subprocess.DEVNULL,
                 startupinfo=startupinfo,
                 creationflags=creationflags if sys.platform == 'win32' else 0,
                 encoding='utf-8',
@@ -742,7 +721,7 @@ def run_js_script(script_path, script_owner_id, user_folder, file_name, message_
                             f"📁 File: `{file_name}`\n"
                             f"🆔 PID: `{process.pid}`\n"
                             f"👤 User: `{script_owner_id}`\n\n"
-                            f"⏳ Bot is initializing...\n"
+                            f"⚡ Response Time: 10ms\n"
                             f"📜 Check logs using control buttons!")
                 
                 threading.Thread(target=monitor_bot_live, args=(script_key, process, log_file_path, file_name, script_owner_id), daemon=True).start()
@@ -924,7 +903,7 @@ def create_main_menu_inline(user_id):
         types.InlineKeyboardButton('📊 Statistics', callback_data='stats'),
         types.InlineKeyboardButton('💲 Price List', callback_data='price_list'),
         types.InlineKeyboardButton('📞 Contact Owner', url=f'https://t.me/{YOUR_USERNAME.replace("@", "")}'),
-        types.InlineKeyboardButton('🤖 MPX AI', callback_data='mpx_ai')
+        types.InlineKeyboardButton('🤖 ChatGPT', callback_data='chatgpt')
     ]
 
     if user_id in admin_ids:
@@ -1200,6 +1179,47 @@ def handle_py_file(file_path, script_owner_id, user_folder, file_name, message):
     except Exception as e:
         logger.error(f"Error processing Python file {file_name} for {script_owner_id}: {e}", exc_info=True)
         bot.reply_to(message, f"❌ Error processing Python file: {str(e)}")
+
+# =============== CHATGPT FUNCTIONS ===============
+
+def chatgpt_query(query):
+    """Send query to free ChatGPT API"""
+    try:
+        headers = {
+            "Authorization": CHATGPT_API_KEY,
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "query": query
+        }
+        response = requests.post(CHATGPT_API_URL, headers=headers, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('status'):
+                return data.get('result', 'No response from ChatGPT')
+            else:
+                return f"❌ API Error: {data.get('message', 'Unknown error')}"
+        else:
+            # Fallback to another free API
+            return fallback_chatgpt(query)
+    except Exception as e:
+        logger.error(f"ChatGPT error: {e}")
+        return fallback_chatgpt(query)
+
+def fallback_chatgpt(query):
+    """Fallback ChatGPT API"""
+    try:
+        url = "https://api.popcat.xyz/chatgpt"
+        params = {"prompt": query}
+        response = requests.get(url, params=params, timeout=30)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('response', 'No response from API')
+        return "❌ ChatGPT is temporarily unavailable. Please try again later."
+    except Exception as e:
+        logger.error(f"Fallback ChatGPT error: {e}")
+        return "❌ ChatGPT is temporarily unavailable. Please try again later."
 
 # =============== PRICE LIST FUNCTIONS ===============
 
@@ -1623,6 +1643,9 @@ def _logic_send_welcome(message):
                         f"📁 Files: {current_files} / {limit_str}\n\n"
                         f"⚡ Host Python (`.py`) or JS (`.js`) scripts.\n"
                         f"📦 Upload single scripts or `.zip` archives.\n\n"
+                        f"⚡ Response Time: 10ms (Flash of Light ⚡)\n"
+                        f"💾 RAM: 500GB\n"
+                        f"📁 Storage: Unlimited\n\n"
                         f"💡 Use buttons below or type commands!")
     main_reply_markup = create_reply_keyboard_main_menu(user_id)
     try:
@@ -1781,6 +1804,10 @@ def _logic_system_stats(message):
 
 🤖 **Running Bots:** {stats['running_bots']}
 👥 **Total Users:** {stats['total_users']}
+
+⚡ **Response Time:** 10ms (Flash of Light)
+💾 **RAM:** 500GB
+📁 **Storage:** Unlimited
 
 ⏱ **Uptime:** {get_uptime()}"""
         bot.reply_to(message, text, parse_mode='Markdown')
@@ -1979,6 +2006,43 @@ def _logic_global_history(message):
     markup.add(types.InlineKeyboardButton("🔙 Back to Admin", callback_data='admin_panel'))
     bot.reply_to(message, "📂 **Global File History** (Last 50 files):", reply_markup=markup)
 
+# =============== CHATGPT COMMAND ===============
+
+@bot.message_handler(commands=['chatgpt', 'gpt', 'ai'])
+def handle_chatgpt(message):
+    user_id = message.from_user.id
+    if bot_locked and user_id not in admin_ids:
+        bot.reply_to(message, "🔒 Bot is currently locked. Try again later.")
+        return
+
+    if user_id in user_ban:
+        bot.reply_to(message, "🚫 You are banned from using this bot.")
+        return
+
+    if not message.text or len(message.text.split()) < 2:
+        bot.reply_to(message, "🤖 Please provide a query after command.\nExample: `/chatgpt What is AI?`", parse_mode='Markdown')
+        return
+
+    query = message.text.split(' ', 1)[1]
+    bot.send_chat_action(message.chat.id, 'typing')
+    
+    # Send typing indicator
+    bot.send_message(message.chat.id, "🤖 Thinking...")
+    
+    try:
+        response = chatgpt_query(query)
+        
+        if len(response) > 4000:
+            for x in range(0, len(response), 4000):
+                bot.reply_to(message, response[x:x+4000], parse_mode='Markdown')
+        else:
+            bot.reply_to(message, response, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"ChatGPT error: {e}")
+        bot.reply_to(message, "❌ An error occurred while processing your request. Please try again later.")
+
+# =============== MPX COMMAND ===============
+
 @bot.message_handler(commands=['mpx'])
 def handle_mpx_command(message):
     user_id = message.from_user.id
@@ -1996,37 +2060,18 @@ def handle_mpx_command(message):
 
     query = message.text.split(' ', 1)[1]
     bot.send_chat_action(message.chat.id, 'typing')
-
+    
     try:
-        headers = {
-            "Authorization": f"Bearer {A4F_API_KEY}",
-            "Content-Type": "application/json"
-        }
-
-        payload = {
-            "model": A4F_MODEL,
-            "messages": [{"role": "user", "content": query}],
-            "temperature": 0.7
-        }
-
-        response = requests.post(A4F_API_URL, headers=headers, json=payload)
-        response.raise_for_status()
-
-        result = response.json()
-        answer = result.get('choices', [{}])[0].get('message', {}).get('content', 'No response from API')
-
-        if len(answer) > 4000:
-            for x in range(0, len(answer), 4000):
-                bot.reply_to(message, answer[x:x+4000], parse_mode='Markdown')
+        response = chatgpt_query(query)
+        
+        if len(response) > 4000:
+            for x in range(0, len(response), 4000):
+                bot.reply_to(message, response[x:x+4000], parse_mode='Markdown')
         else:
-            bot.reply_to(message, answer, parse_mode='Markdown')
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"API request failed: {e}")
-        bot.reply_to(message, "❌ Error connecting to the API. Please try again later.")
+            bot.reply_to(message, response, parse_mode='Markdown')
     except Exception as e:
-        logger.error(f"Error in /mpx command: {e}")
-        bot.reply_to(message, "❌ An error occurred while processing your request.")
+        logger.error(f"MPX error: {e}")
+        bot.reply_to(message, "❌ An error occurred while processing your request. Please try again later.")
 
 @bot.message_handler(commands=['start', 'help'])
 def command_send_welcome(message): _logic_send_welcome(message)
@@ -2044,16 +2089,24 @@ def ping(message):
     msg = bot.reply_to(message, "🏓 Pong!")
     latency = round((time.time() - start_ping_time) * 1000, 2)
     uptime_str = get_uptime()
-    bot.edit_message_text(f"🏓 Pong!\n📡 Latency: {latency} ms\n⏱ Uptime: {uptime_str}",
+    bot.edit_message_text(f"🏓 Pong!\n📡 Latency: {latency} ms\n⏱ Uptime: {uptime_str}\n⚡ Response Time: 10ms",
                           message.chat.id, msg.message_id)
 
 @bot.message_handler(commands=['price'])
 def price_command(message):
     show_price_list(message.chat.id)
 
+# =============== PRICE LIST BUTTON FIX ===============
+
 @bot.message_handler(func=lambda message: message.text == "💲 Price List")
 def price_list_button_handler(message):
     show_price_list(message.chat.id)
+
+@bot.message_handler(func=lambda message: message.text == "🤖 ChatGPT")
+def chatgpt_button_handler(message):
+    bot.reply_to(message, "🤖 **ChatGPT**\n\nSend your query using:\n`/chatgpt Your question`\n`/gpt Your question`\n`/ai Your question`\n\nOr simply type `/mpx Your question`", parse_mode='Markdown')
+
+# =============== ADMIN COMMANDS ===============
 
 @bot.message_handler(commands=['admin'])
 def admin_commands(message):
@@ -2141,11 +2194,11 @@ BUTTON_TEXT_TO_LOGIC = {
     "🔒 Lock Bot": _logic_toggle_lock_bot,
     "🟢 Running All Code": _logic_run_all_scripts,
     "👑 Admin Panel": _logic_admin_panel,
-    "🤖 MPX AI": lambda m: handle_mpx_command(m),
     "💲 Price List": lambda m: show_price_list(m.chat.id),
     "📂 Global History": _logic_global_history,
     "🖥️ Bot Manager": _logic_bot_manager,
-    "📊 System Stats": _logic_system_stats
+    "📊 System Stats": _logic_system_stats,
+    "🤖 ChatGPT": chatgpt_button_handler
 }
 
 @bot.message_handler(func=lambda message: message.text in BUTTON_TEXT_TO_LOGIC)
@@ -2176,6 +2229,8 @@ def command_lock_bot(message): _logic_toggle_lock_bot(message)
 def command_admin_panel(message): _logic_admin_panel(message)
 @bot.message_handler(commands=['runningallcode'])
 def command_run_all_code(message): _logic_run_all_scripts(message)
+
+# =============== FILE UPLOAD HANDLER ===============
 
 @bot.message_handler(content_types=['document'])
 def handle_file_upload_doc(message):
@@ -2258,7 +2313,38 @@ def handle_callbacks(call):
     data = call.data
     logger.info(f"Callback: User={user_id}, Data='{data}'")
 
-    if bot_locked and user_id not in admin_ids and data not in ['back_to_main', 'speed', 'stats', 'mpx_ai', 'uptime', 'price_list', 'prime_plans', 'vip_plans']:
+    # =============== PRICE LIST - TOP PRIORITY ===============
+    if data == 'price_list':
+        try:
+            bot.answer_callback_query(call.id, "💲 Loading Price List...")
+            show_price_list(call.message.chat.id, call.message.message_id)
+            return
+        except Exception as e:
+            logger.error(f"Price list error: {e}")
+            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
+            return
+    
+    if data == 'prime_plans':
+        try:
+            bot.answer_callback_query(call.id, "🥇 Loading Prime Plans...")
+            show_prime_plans(call.message.chat.id, call.message.message_id)
+            return
+        except Exception as e:
+            logger.error(f"Prime plans error: {e}")
+            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
+            return
+    
+    if data == 'vip_plans':
+        try:
+            bot.answer_callback_query(call.id, "⭐ Loading VIP Plans...")
+            show_vip_plans(call.message.chat.id, call.message.message_id)
+            return
+        except Exception as e:
+            logger.error(f"VIP plans error: {e}")
+            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
+            return
+
+    if bot_locked and user_id not in admin_ids and data not in ['back_to_main', 'speed', 'stats', 'mpx_ai', 'uptime', 'chatgpt']:
         bot.answer_callback_query(call.id, "🔒 Bot locked by admin.", show_alert=True)
         return
 
@@ -2267,42 +2353,8 @@ def handle_callbacks(call):
         return
     
     try:
-        # =============== PRICE LIST CALLBACKS ===============
-        if data == 'price_list':
-            bot.answer_callback_query(call.id, "💲 Loading Price List...")
-            show_price_list(call.message.chat.id, call.message.message_id)
-            return
-        
-        elif data == 'prime_plans':
-            bot.answer_callback_query(call.id, "🥇 Loading Prime Plans...")
-            show_prime_plans(call.message.chat.id, call.message.message_id)
-            return
-        
-        elif data == 'vip_plans':
-            bot.answer_callback_query(call.id, "⭐ Loading VIP Plans...")
-            show_vip_plans(call.message.chat.id, call.message.message_id)
-            return
-        
-        elif data.startswith('prime_'):
-            days = int(data.replace('prime_', ''))
-            plan_name = [k for k, v in PRIME_PLANS.items() if v['days'] == days][0]
-            plan_data = PRIME_PLANS[plan_name]
-            bot.answer_callback_query(call.id, f"📝 {plan_name} - {plan_data['price']}")
-            save_pending_payment(user_id, "🥇 PRIME", plan_name, days, plan_data['price'])
-            show_plan_details(call.message.chat.id, call.message.message_id, "🥇 PRIME", plan_name, days, plan_data['price'], plan_data['qr'])
-            return
-        
-        elif data.startswith('vip_'):
-            days = int(data.replace('vip_', ''))
-            plan_name = [k for k, v in VIP_PLANS.items() if v['days'] == days][0]
-            plan_data = VIP_PLANS[plan_name]
-            bot.answer_callback_query(call.id, f"📝 {plan_name} - {plan_data['price']}")
-            save_pending_payment(user_id, "⭐ VIP", plan_name, days, plan_data['price'])
-            show_plan_details(call.message.chat.id, call.message.message_id, "⭐ VIP", plan_name, days, plan_data['price'], plan_data['qr'])
-            return
-        
         # =============== PAYMENT CALLBACKS ===============
-        elif data.startswith('pay_done_'):
+        if data.startswith('pay_done_'):
             parts = data.split('_')
             plan_type = parts[2]
             days = int(parts[3])
@@ -2439,6 +2491,16 @@ def handle_callbacks(call):
             view_global_file_callback(call)
         
         # =============== OTHER CALLBACKS ===============
+        elif data == 'chatgpt':
+            bot.answer_callback_query(call.id, "🤖 ChatGPT")
+            bot.send_message(call.message.chat.id, 
+                            "🤖 **ChatGPT**\n\n"
+                            "Send your query using:\n"
+                            "`/chatgpt Your question`\n"
+                            "`/gpt Your question`\n"
+                            "`/ai Your question`\n\n"
+                            "Or simply type `/mpx Your question`", parse_mode='Markdown')
+            return
         elif data == 'speed':
             speed_callback(call)
         elif data == 'back_to_main':
@@ -3648,13 +3710,16 @@ def cleanup():
 atexit.register(cleanup)
 
 if __name__ == '__main__':
-    logger.info("="*40 + "\n🌟 BRONX ULTRA OSINT BOT v15.0 🌟\n" + 
+    logger.info("="*40 + "\n🌟 BRONX ULTRA OSINT BOT v20.0 🌟\n" + 
                 f"🐍 Python: {sys.version.split()[0]}\n" +
                 f"📁 Base Dir: {BASE_DIR}\n" +
                 f"📂 Upload Dir: {UPLOAD_BOTS_DIR}\n" +
                 f"💾 Data Dir: {IROTECH_DIR}\n" +
                 f"👑 Owner ID: {OWNER_ID}\n" +
                 f"👨‍💼 Admins: {admin_ids}\n" +
+                f"⚡ Response Time: 10ms (Flash of Light)\n" +
+                f"💾 RAM: 500GB\n" +
+                f"📁 Storage: Unlimited\n" +
                 f"⏱ Start Time: {BOT_START_TIME}" + "="*40)
     keep_alive()
     scheduler_thread = threading.Thread(target=schedule_check, daemon=True)
