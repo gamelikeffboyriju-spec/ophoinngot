@@ -905,27 +905,66 @@ def handle_py_file(file_path, script_owner_id, user_folder, file_name, message):
         logger.error(f"Error processing Python file {file_name} for {script_owner_id}: {e}", exc_info=True)
         bot.reply_to(message, f"❌ Error processing Python file: {str(e)}")
 
-# =============== PUBLIC PRICE LIST FUNCTIONS ===============
+# =============== PRICE LIST FUNCTIONS ===============
 
 def show_price_list(chat_id, message_id=None):
     text = """💲 **Bot Hosting Subscription Plans** 💲
 
-🌟 **Choose Your Plan:**
+🌟 **Choose Your Perfect Plan:**
 
-🥇 **Prime Plans** - Best for regular users
-⭐ **VIP Plans** - Best for power users
+━━━━━━━━━━━━━━━━━━━━━━━━━
+🥇 **PRIME PLANS** 🥇
+━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📞 Contact Owner: """ + YOUR_USERNAME + """
+✅ 5 Days = ₹50
+✅ 15 Days = ₹100
+✅ 30 Days = ₹199
+✅ 40 Days = ₹240
+✅ 60 Days = ₹299
+✅ 80 Days = ₹499
+✅ 150 Days = ₹799
+✅ 365 Days = ₹999
 
-Click below to view plans!"""
-    
+🎁 **Prime Features:**
+• 24/7 Working ✅
+• All Time Running ✅
+• No Stop ✅
+• Fast Response ✅
+• File Hosting Limit ✅
+• Py, JS, ZIP Support ✅
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+⭐ **VIP PLANS** ⭐
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ 30 Days = ₹300
+✅ 60 Days = ₹600
+✅ 80 Days = ₹800
+✅ 150 Days = ₹1500
+✅ 200 Days = ₹2000
+✅ 365 Days = ₹36500
+✅ Life Time = ₹10000
+
+🎁 **VIP Features:**
+• Unlimited File Hosting ✅
+• No Limits ✅
+• 24/7 Working ✅
+• Ultra Fast Response ✅
+• All Features Unlimited ✅
+• Any File Support ✅
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+📞 **Contact Owner:** @BRONX_ULTRA
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 Click below to buy or contact owner!"""
+
     markup = create_price_list()
     
     if message_id:
         try:
             bot.edit_message_text(text, chat_id, message_id, reply_markup=markup, parse_mode='Markdown')
-        except Exception as e:
-            logger.error(f"Error editing price list: {e}")
+        except:
             bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
     else:
         bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
@@ -933,37 +972,58 @@ Click below to view plans!"""
 def show_prime_plans(chat_id, message_id):
     text = """🥇 **Prime Plans** 🥇
 
-✅ 24/7 Working
-✅ All Time Running
-✅ No Stop
-✅ Fast Response
-✅ File Hosting
-✅ Py, JS, ZIP Support
+━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ 5 Days = ₹50
+✅ 15 Days = ₹100
+✅ 30 Days = ₹199
+✅ 40 Days = ₹240
+✅ 60 Days = ₹299
+✅ 80 Days = ₹499
+✅ 150 Days = ₹799
+✅ 365 Days = ₹999
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎁 **Prime Features:**
+• 24/7 Working ✅
+• All Time Running ✅
+• No Stop ✅
+• Fast Response ✅
+• File Hosting Limit ✅
+• Py, JS, ZIP Support ✅
 
 **Select a plan below:**"""
     
     try:
         bot.edit_message_text(text, chat_id, message_id, reply_markup=create_prime_plans(), parse_mode='Markdown')
-    except Exception as e:
-        logger.error(f"Error showing prime plans: {e}")
+    except:
         bot.send_message(chat_id, text, reply_markup=create_prime_plans(), parse_mode='Markdown')
 
 def show_vip_plans(chat_id, message_id):
     text = """⭐ **VIP Plans** ⭐
 
-✅ Unlimited File Hosting
-✅ No Limits
-✅ 24/7 Working
-✅ Ultra Fast Response
-✅ All Features Unlimited
-✅ Any File Support
+━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ 30 Days = ₹300
+✅ 60 Days = ₹600
+✅ 80 Days = ₹800
+✅ 150 Days = ₹1500
+✅ 200 Days = ₹2000
+✅ 365 Days = ₹36500
+✅ Life Time = ₹10000
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎁 **VIP Features:**
+• Unlimited File Hosting ✅
+• No Limits ✅
+• 24/7 Working ✅
+• Ultra Fast Response ✅
+• All Features Unlimited ✅
+• Any File Support ✅
 
 **Select a plan below:**"""
     
     try:
         bot.edit_message_text(text, chat_id, message_id, reply_markup=create_vip_plans(), parse_mode='Markdown')
-    except Exception as e:
-        logger.error(f"Error showing vip plans: {e}")
+    except:
         bot.send_message(chat_id, text, reply_markup=create_vip_plans(), parse_mode='Markdown')
 
 def show_plan_details(chat_id, message_id, plan_type, plan_name, days, price, qr_url):
@@ -1003,7 +1063,10 @@ def show_plan_details(chat_id, message_id, plan_type, plan_name, days, price, qr
     
     try:
         bot.send_photo(chat_id, qr_url, caption=text, reply_markup=markup, parse_mode='Markdown')
-        bot.delete_message(chat_id, message_id)
+        try:
+            bot.delete_message(chat_id, message_id)
+        except:
+            pass
     except Exception as e:
         logger.error(f"Error sending QR: {e}")
         text += f"\n\n🔗 QR Link: {qr_url}"
@@ -1566,7 +1629,7 @@ def ping(message):
                           message.chat.id, msg.message_id)
 
 @bot.message_handler(commands=['price'])
-def price_list_command(message):
+def price_command(message):
     """Public Price List Command"""
     show_price_list(message.chat.id)
 
@@ -1778,7 +1841,7 @@ def handle_callbacks(call):
         return
     
     try:
-        # =============== PUBLIC PRICE LIST CALLBACKS ===============
+        # =============== PRICE LIST CALLBACKS ===============
         if data == 'price_list':
             bot.answer_callback_query(call.id, "💲 Loading Price List...")
             show_price_list(call.message.chat.id, call.message.message_id)
@@ -3142,7 +3205,7 @@ def cleanup():
 atexit.register(cleanup)
 
 if __name__ == '__main__':
-    logger.info("="*40 + "\n🌟 BRONX ULTRA OSINT BOT v10.0 🌟\n" + 
+    logger.info("="*40 + "\n🌟 BRONX ULTRA OSINT BOT v11.0 🌟\n" + 
                 f"🐍 Python: {sys.version.split()[0]}\n" +
                 f"📁 Base Dir: {BASE_DIR}\n" +
                 f"📂 Upload Dir: {UPLOAD_BOTS_DIR}\n" +
