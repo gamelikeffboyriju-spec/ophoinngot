@@ -2334,101 +2334,123 @@ def handle_callbacks(call):
 
     # =============== PRICE LIST - TOP PRIORITY ===============
     if data == 'price_list':
-    try:
-        bot.answer_callback_query(call.id, "💲 Loading Price List...")
-        show_price_list(call.message.chat.id, call.message.message_id)
-        return
-    except Exception as e:
-        logger.error(f"Price list error: {e}")
-        bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
-        return
-
-if data == 'show_prime_plans':
-    try:
-        bot.answer_callback_query(call.id, "🥇 Loading Prime Plans...")
-        show_prime_plans(call.message.chat.id, call.message.message_id)
-        return
-    except Exception as e:
-        logger.error(f"Prime plans error: {e}")
-        bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
-        return
-
-if data == 'show_vip_plans':
-    try:
-        bot.answer_callback_query(call.id, "⭐ Loading VIP Plans...")
-        show_vip_plans(call.message.chat.id, call.message.message_id)
-        return
-    except Exception as e:
-        logger.error(f"VIP plans error: {e}")
-        bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
-        return
-
-# =============== BUY PLAN ===============
-if data.startswith('buy_prime_'):
-    parts = data.split('_')
-    days = int(parts[2])
-    plan_name = '_'.join(parts[3:])
+        try:  # <-- Yeh try block IF ke under hona chahiye
+            bot.answer_callback_query(call.id, "💲 Loading Price List...")
+            show_price_list(call.message.chat.id, call.message.message_id)
+            return
+        except Exception as e:
+            logger.error(f"Price list error: {e}")
+            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
+            return
     
-    plan_data = PRIME_PLANS.get(plan_name)
-    if not plan_data:
-        for name, info in PRIME_PLANS.items():
-            if info['days'] == days:
-                plan_name = name
-                plan_data = info
-                break
+    if data == 'show_prime_plans':
+        try:
+            bot.answer_callback_query(call.id, "🥇 Loading Prime Plans...")
+            show_prime_plans(call.message.chat.id, call.message.message_id)
+            return
+        except Exception as e:
+            logger.error(f"Prime plans error: {e}")
+            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
+            return
     
-    if plan_data:
-        bot.answer_callback_query(call.id, f"📝 {plan_name} selected!")
-        show_plan_details(
-            call.message.chat.id, 
-            call.message.message_id,
-            "🥇 PRIME",
-            plan_name,
-            days,
-            plan_data['price'],
-            plan_data['qr']
-        )
-    else:
-        bot.answer_callback_query(call.id, "❌ Plan not found!", show_alert=True)
-    return
-
-if data.startswith('buy_vip_'):
-    parts = data.split('_')
-    days = int(parts[2])
-    plan_name = '_'.join(parts[3:])
+    if data == 'show_vip_plans':
+        try:
+            bot.answer_callback_query(call.id, "⭐ Loading VIP Plans...")
+            show_vip_plans(call.message.chat.id, call.message.message_id)
+            return
+        except Exception as e:
+            logger.error(f"VIP plans error: {e}")
+            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
+            return
     
-    plan_data = VIP_PLANS.get(plan_name)
-    if not plan_data:
-        for name, info in VIP_PLANS.items():
-            if info['days'] == days:
-                plan_name = name
-                plan_data = info
-                break
+    # =============== BUY PLAN ===============
+    if data.startswith('buy_prime_'):
+        try:
+            parts = data.split('_')
+            days = int(parts[2])
+            plan_name = '_'.join(parts[3:])
+            
+            plan_data = PRIME_PLANS.get(plan_name)
+            if not plan_data:
+                for name, info in PRIME_PLANS.items():
+                    if info['days'] == days:
+                        plan_name = name
+                        plan_data = info
+                        break
+            
+            if plan_data:
+                bot.answer_callback_query(call.id, f"📝 {plan_name} selected!")
+                show_plan_details(
+                    call.message.chat.id, 
+                    call.message.message_id,
+                    "🥇 PRIME",
+                    plan_name,
+                    days,
+                    plan_data['price'],
+                    plan_data['qr']
+                )
+            else:
+                bot.answer_callback_query(call.id, "❌ Plan not found!", show_alert=True)
+            return
+        except Exception as e:
+            logger.error(f"Buy prime error: {e}")
+            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
+            return
     
-    if plan_data:
-        bot.answer_callback_query(call.id, f"📝 {plan_name} selected!")
-        show_plan_details(
-            call.message.chat.id, 
-            call.message.message_id,
-            "⭐ VIP",
-            plan_name,
-            days,
-            plan_data['price'],
-            plan_data['qr']
-        )
-    else:
-        bot.answer_callback_query(call.id, "❌ Plan not found!", show_alert=True)
-    return
+    if data.startswith('buy_vip_'):
+        try:
+            parts = data.split('_')
+            days = int(parts[2])
+            plan_name = '_'.join(parts[3:])
+            
+            plan_data = VIP_PLANS.get(plan_name)
+            if not plan_data:
+                for name, info in VIP_PLANS.items():
+                    if info['days'] == days:
+                        plan_name = name
+                        plan_data = info
+                        break
+            
+            if plan_data:
+                bot.answer_callback_query(call.id, f"📝 {plan_name} selected!")
+                show_plan_details(
+                    call.message.chat.id, 
+                    call.message.message_id,
+                    "⭐ VIP",
+                    plan_name,
+                    days,
+                    plan_data['price'],
+                    plan_data['qr']
+                )
+            else:
+                bot.answer_callback_query(call.id, "❌ Plan not found!", show_alert=True)
+            return
+        except Exception as e:
+            logger.error(f"Buy vip error: {e}")
+            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
+            return
+    
+    if data == 'back_to_prime_plans':
+        try:
+            bot.answer_callback_query(call.id, "🔙 Back to Prime Plans")
+            show_prime_plans(call.message.chat.id, call.message.message_id)
+            return
+        except Exception as e:
+            logger.error(f"Back to prime error: {e}")
+            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
+            return
+    
+    if data == 'back_to_vip_plans':
+        try:
+            bot.answer_callback_query(call.id, "🔙 Back to VIP Plans")
+            show_vip_plans(call.message.chat.id, call.message.message_id)
+            return
+        except Exception as e:
+            logger.error(f"Back to vip error: {e}")
+            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
+            return
 
-if data == 'back_to_prime_plans':
-    bot.answer_callback_query(call.id, "🔙 Back to Prime Plans")
-    show_prime_plans(call.message.chat.id, call.message.message_id)
-    return
-
-if data == 'back_to_vip_plans':
-    bot.answer_callback_query(call.id, "🔙 Back to VIP Plans")
-    show_vip_plans(call.message.chat.id, call.message.message_id)
-    return
+    # ... baaki code
     
     try:
         # =============== PAYMENT CALLBACKS ===============
