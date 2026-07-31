@@ -27,7 +27,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "🤖 BRONX ULTRA OSINT BOT v20.0 is running!"
+    return "🤖 BRONX ULTRA OSINT BOT v21.0 is running!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -94,24 +94,24 @@ logger = logging.getLogger(__name__)
 
 # =============== SUBSCRIPTION PLANS WITH QR ===============
 PRIME_PLANS = {
-    "5 Days": {"days": 5, "price": "₹50", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"},
-    "15 Days": {"days": 15, "price": "₹100", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"},
-    "30 Days": {"days": 30, "price": "₹199", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"},
-    "40 Days": {"days": 40, "price": "₹240", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"},
-    "60 Days": {"days": 60, "price": "₹299", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"},
-    "80 Days": {"days": 80, "price": "₹499", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"},
-    "150 Days": {"days": 150, "price": "₹799", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"},
-    "365 Days": {"days": 365, "price": "₹999", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"}
+    "5 Days": {"days": 5, "price": "₹50", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
+    "15 Days": {"days": 15, "price": "₹100", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
+    "30 Days": {"days": 30, "price": "₹199", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
+    "40 Days": {"days": 40, "price": "₹240", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
+    "60 Days": {"days": 60, "price": "₹299", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
+    "80 Days": {"days": 80, "price": "₹499", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
+    "150 Days": {"days": 150, "price": "₹799", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
+    "365 Days": {"days": 365, "price": "₹999", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"}
 }
 
 VIP_PLANS = {
-    "30 Days": {"days": 30, "price": "₹300", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"},
-    "60 Days": {"days": 60, "price": "₹600", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"},
-    "80 Days": {"days": 80, "price": "₹800", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"},
-    "150 Days": {"days": 150, "price": "₹1500", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"},
-    "200 Days": {"days": 200, "price": "₹2000", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"},
-    "365 Days": {"days": 365, "price": "₹36500", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"},
-    "Life Time": {"days": 99999, "price": "₹10000", "qr": "https://i.ibb.co/vC0mHYpq/IMG-20260729-060746-551.jpg"}
+    "30 Days": {"days": 30, "price": "₹300", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
+    "60 Days": {"days": 60, "price": "₹600", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
+    "80 Days": {"days": 80, "price": "₹800", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
+    "150 Days": {"days": 150, "price": "₹1500", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
+    "200 Days": {"days": 200, "price": "₹2000", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
+    "365 Days": {"days": 365, "price": "₹36500", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
+    "Life Time": {"days": 99999, "price": "₹10000", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"}
 }
 
 COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
@@ -985,6 +985,7 @@ def create_admin_panel():
     markup.row(types.InlineKeyboardButton('💲 Price List', callback_data='price_list'))
     markup.row(types.InlineKeyboardButton('🖥️ Bot Manager', callback_data='bot_manager'))
     markup.row(types.InlineKeyboardButton('📊 System Stats', callback_data='system_stats'))
+    markup.row(types.InlineKeyboardButton('👥 All Users Bots', callback_data='all_users_bots'))  # NEW
     markup.row(types.InlineKeyboardButton('🔙 Back to Main', callback_data='back_to_main'))
     return markup
 
@@ -1434,6 +1435,9 @@ def send_payment_notification(user_id, plan_type, plan_name, days, price):
     elif user_id == OWNER_ID:
         status = "👑 Owner"
     
+    # QR Code for payment
+    qr_url = "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"
+    
     text = f"""💳 **Payment Notification** 💳
 
 👤 **User Details:**
@@ -1448,17 +1452,24 @@ def send_payment_notification(user_id, plan_type, plan_name, days, price):
 • Duration: {days} days
 • Price: {price}
 
-✅ Click below to add this user!"""
+📱 **QR Code for Payment:**
+"""
     
     markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(types.InlineKeyboardButton("✅ Add Prime", callback_data=f'add_prime_{user_id}_{days}'))
-    markup.add(types.InlineKeyboardButton("✅ Add VIP", callback_data=f'add_vip_{user_id}_{days}'))
-    markup.add(types.InlineKeyboardButton("❌ Reject", callback_data=f'reject_payment_{user_id}'))
+    markup.add(
+        types.InlineKeyboardButton("✅ Approve & Add Prime", callback_data=f'add_prime_{user_id}_{days}'),
+        types.InlineKeyboardButton("✅ Approve & Add VIP", callback_data=f'add_vip_{user_id}_{days}'),
+        types.InlineKeyboardButton("❌ Reject Payment", callback_data=f'reject_payment_{user_id}')
+    )
     
     try:
-        bot.send_message(OWNER_ID, text, reply_markup=markup, parse_mode='Markdown')
+        # Send QR with payment instructions
+        bot.send_photo(OWNER_ID, qr_url, caption=text, reply_markup=markup, parse_mode='Markdown')
     except Exception as e:
         logger.error(f"Error sending payment notification to owner: {e}")
+        # Fallback: send without photo
+        text += f"\n🔗 QR Link: {qr_url}"
+        bot.send_message(OWNER_ID, text, reply_markup=markup, parse_mode='Markdown')
 
 def send_subscription_confirmation(user_id, status_type, expiry_date):
     try:
@@ -2411,6 +2422,12 @@ def handle_callbacks(call):
             bot.answer_callback_query(call.id, f"✅ Prime added to user {target_user_id}!")
             bot.edit_message_text(f"✅ Prime added to user {target_user_id} for {days} days!", 
                                 call.message.chat.id, call.message.message_id)
+            
+            # Admin ko bhi notify karein
+            try:
+                bot.send_message(OWNER_ID, f"✅ Prime added to user {target_user_id} for {days} days by Admin {user_id}!")
+            except:
+                pass
             return
         
         elif data.startswith('add_vip_'):
@@ -2426,6 +2443,11 @@ def handle_callbacks(call):
             bot.answer_callback_query(call.id, f"✅ VIP added to user {target_user_id}!")
             bot.edit_message_text(f"✅ VIP added to user {target_user_id} for {days} days!", 
                                 call.message.chat.id, call.message.message_id)
+            
+            try:
+                bot.send_message(OWNER_ID, f"✅ VIP added to user {target_user_id} for {days} days by Admin {user_id}!")
+            except:
+                pass
             return
         
         elif data.startswith('reject_payment_'):
@@ -2440,11 +2462,42 @@ def handle_callbacks(call):
                                 call.message.chat.id, call.message.message_id)
             
             try:
+                bot.send_message(OWNER_ID, f"❌ Payment rejected for user {target_user_id} by Admin {user_id}!")
+            except:
+                pass
+            
+            try:
                 bot.send_message(target_user_id, 
                                 f"❌ **Your payment was rejected!**\n\n"
                                 f"Please contact admin: {YOUR_USERNAME}", parse_mode='Markdown')
             except:
                 pass
+            return
+
+        # =============== ALL USERS BOTS (ADMIN) ===============
+        elif data == 'all_users_bots':
+            if user_id not in admin_ids:
+                bot.answer_callback_query(call.id, "👑 Admin only!", show_alert=True)
+                return
+            
+            bot.answer_callback_query(call.id, "👥 Loading all users' bots...")
+            
+            if not user_files:
+                bot.send_message(call.message.chat.id, "📁 No users have uploaded any files yet.")
+                return
+            
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            for uid, files in user_files.items():
+                if files:
+                    for file_name, file_type in files:
+                        is_running = is_bot_running(uid, file_name)
+                        status_icon = "🟢" if is_running else "🔴"
+                        btn_text = f"{status_icon} User {uid}: {file_name} ({file_type})"
+                        markup.add(types.InlineKeyboardButton(btn_text, callback_data=f'file_{uid}_{file_name}'))
+            
+            markup.add(types.InlineKeyboardButton("🔙 Back to Admin", callback_data='admin_panel'))
+            bot.send_message(call.message.chat.id, "👥 **All Users' Bots:**\nClick to control any bot.", 
+                            reply_markup=markup, parse_mode='Markdown')
             return
 
         # =============== BOT MANAGER CALLBACKS ===============
@@ -2626,6 +2679,7 @@ def file_control_callback(call):
         script_owner_id = int(script_owner_id_str)
         requesting_user_id = call.from_user.id
 
+        # ✅ FIX: Admin can control ANY user's bot
         if not (requesting_user_id == script_owner_id or requesting_user_id in admin_ids):
             logger.warning(f"User {requesting_user_id} tried to access file '{file_name}' of user {script_owner_id} without permission.")
             bot.answer_callback_query(call.id, "🔒 You can only manage your own files.", show_alert=True)
@@ -2642,9 +2696,13 @@ def file_control_callback(call):
         is_running = is_bot_running(script_owner_id, file_name)
         status_text = '🟢 Running' if is_running else '🔴 Stopped'
         file_type = next((f[1] for f in user_files_list if f[0] == file_name), '?')
+        
+        # Show admin tag if admin is viewing
+        admin_tag = " (👑 Admin View)" if requesting_user_id in admin_ids and requesting_user_id != script_owner_id else ""
+        
         try:
             bot.edit_message_text(
-                f"📁 **Controls for:** `{file_name}` ({file_type})\n"
+                f"📁 **Controls for:** `{file_name}` ({file_type}){admin_tag}\n"
                 f"👤 User: `{script_owner_id}`\n"
                 f"📊 Status: {status_text}",
                 call.message.chat.id, call.message.message_id,
@@ -3710,7 +3768,7 @@ def cleanup():
 atexit.register(cleanup)
 
 if __name__ == '__main__':
-    logger.info("="*40 + "\n🌟 BRONX ULTRA OSINT BOT v20.0 🌟\n" + 
+    logger.info("="*40 + "\n🌟 BRONX ULTRA OSINT BOT v21.0 🌟\n" + 
                 f"🐍 Python: {sys.version.split()[0]}\n" +
                 f"📁 Base Dir: {BASE_DIR}\n" +
                 f"📂 Upload Dir: {UPLOAD_BOTS_DIR}\n" +
