@@ -2334,8 +2334,8 @@ def handle_callbacks(call):
 
     # =============== PRICE LIST - TOP PRIORITY ===============
     if data == 'price_list':
-        try:  # <-- Yeh try block IF ke under hona chahiye
-            bot.answer_callback_query(call.id, "💲 Loading Price List...")
+        bot.answer_callback_query(call.id, "💲 Loading Price List...")
+        try:
             show_price_list(call.message.chat.id, call.message.message_id)
             return
         except Exception as e:
@@ -2344,8 +2344,8 @@ def handle_callbacks(call):
             return
     
     if data == 'show_prime_plans':
+        bot.answer_callback_query(call.id, "🥇 Loading Prime Plans...")
         try:
-            bot.answer_callback_query(call.id, "🥇 Loading Prime Plans...")
             show_prime_plans(call.message.chat.id, call.message.message_id)
             return
         except Exception as e:
@@ -2354,8 +2354,8 @@ def handle_callbacks(call):
             return
     
     if data == 'show_vip_plans':
+        bot.answer_callback_query(call.id, "⭐ Loading VIP Plans...")
         try:
-            bot.answer_callback_query(call.id, "⭐ Loading VIP Plans...")
             show_vip_plans(call.message.chat.id, call.message.message_id)
             return
         except Exception as e:
