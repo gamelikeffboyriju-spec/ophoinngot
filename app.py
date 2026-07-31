@@ -1013,27 +1013,35 @@ def create_subscription_menu():
     return markup
 
 def create_price_list():
-    markup = types.InlineKeyboardMarkup(row_width=1)
-    markup.add(types.InlineKeyboardButton("🥇 PRIME PLANS 🥇", callback_data='prime_plans'))
-    markup.add(types.InlineKeyboardButton("⭐ VIP PLANS ⭐", callback_data='vip_plans'))
-    markup.add(types.InlineKeyboardButton("📞 Contact Owner", url=f'https://t.me/{YOUR_USERNAME.replace("@", "")}'))
-    markup.add(types.InlineKeyboardButton("🔙 Back to Main", callback_data='back_to_main'))
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("🥇 PRIME PLANS", callback_data='show_prime_plans'),
+        types.InlineKeyboardButton("⭐ VIP PLANS", callback_data='show_vip_plans')
+    )
+    markup.add(
+        types.InlineKeyboardButton("📞 Contact Owner", url=f'https://t.me/{YOUR_USERNAME.replace("@", "")}'),
+        types.InlineKeyboardButton("🔙 Back to Main", callback_data='back_to_main')
+    )
     return markup
 
 def create_prime_plans():
     markup = types.InlineKeyboardMarkup(row_width=2)
     for plan_name, plan_data in PRIME_PLANS.items():
-        markup.add(types.InlineKeyboardButton(f"{plan_name} - {plan_data['price']}", 
-                                             callback_data=f'prime_{plan_data["days"]}'))
-    markup.add(types.InlineKeyboardButton("🔙 Back to Prices", callback_data='price_list'))
+        markup.add(types.InlineKeyboardButton(
+            f"{plan_name} - {plan_data['price']}", 
+            callback_data=f'buy_prime_{plan_data["days"]}_{plan_name}'
+        ))
+    markup.add(types.InlineKeyboardButton("🔙 Back to Price List", callback_data='price_list'))
     return markup
 
 def create_vip_plans():
     markup = types.InlineKeyboardMarkup(row_width=2)
     for plan_name, plan_data in VIP_PLANS.items():
-        markup.add(types.InlineKeyboardButton(f"{plan_name} - {plan_data['price']}", 
-                                             callback_data=f'vip_{plan_data["days"]}'))
-    markup.add(types.InlineKeyboardButton("🔙 Back to Prices", callback_data='price_list'))
+        markup.add(types.InlineKeyboardButton(
+            f"{plan_name} - {plan_data['price']}", 
+            callback_data=f'buy_vip_{plan_data["days"]}_{plan_name}'
+        ))
+    markup.add(types.InlineKeyboardButton("🔙 Back to Price List", callback_data='price_list'))
     return markup
 
 def create_payment_buttons(plan_type, plan_name, days, price):
@@ -2326,42 +2334,101 @@ def handle_callbacks(call):
 
     # =============== PRICE LIST - TOP PRIORITY ===============
     if data == 'price_list':
-        try:
-            bot.answer_callback_query(call.id, "💲 Loading Price List...")
-            show_price_list(call.message.chat.id, call.message.message_id)
-            return
-        except Exception as e:
-            logger.error(f"Price list error: {e}")
-            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
-            return
-    
-    if data == 'prime_plans':
-        try:
-            bot.answer_callback_query(call.id, "🥇 Loading Prime Plans...")
-            show_prime_plans(call.message.chat.id, call.message.message_id)
-            return
-        except Exception as e:
-            logger.error(f"Prime plans error: {e}")
-            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
-            return
-    
-    if data == 'vip_plans':
-        try:
-            bot.answer_callback_query(call.id, "⭐ Loading VIP Plans...")
-            show_vip_plans(call.message.chat.id, call.message.message_id)
-            return
-        except Exception as e:
-            logger.error(f"VIP plans error: {e}")
-            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
-            return
-
-    if bot_locked and user_id not in admin_ids and data not in ['back_to_main', 'speed', 'stats', 'mpx_ai', 'uptime', 'chatgpt']:
-        bot.answer_callback_query(call.id, "🔒 Bot locked by admin.", show_alert=True)
+    try:
+        bot.answer_callback_query(call.id, "💲 Loading Price List...")
+        show_price_list(call.message.chat.id, call.message.message_id)
+        return
+    except Exception as e:
+        logger.error(f"Price list error: {e}")
+        bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
         return
 
-    if user_id in user_ban:
-        bot.answer_callback_query(call.id, "🚫 You are banned.", show_alert=True)
+if data == 'show_prime_plans':
+    try:
+        bot.answer_callback_query(call.id, "🥇 Loading Prime Plans...")
+        show_prime_plans(call.message.chat.id, call.message.message_id)
         return
+    except Exception as e:
+        logger.error(f"Prime plans error: {e}")
+        bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
+        return
+
+if data == 'show_vip_plans':
+    try:
+        bot.answer_callback_query(call.id, "⭐ Loading VIP Plans...")
+        show_vip_plans(call.message.chat.id, call.message.message_id)
+        return
+    except Exception as e:
+        logger.error(f"VIP plans error: {e}")
+        bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
+        return
+
+# =============== BUY PLAN ===============
+if data.startswith('buy_prime_'):
+    parts = data.split('_')
+    days = int(parts[2])
+    plan_name = '_'.join(parts[3:])
+    
+    plan_data = PRIME_PLANS.get(plan_name)
+    if not plan_data:
+        for name, info in PRIME_PLANS.items():
+            if info['days'] == days:
+                plan_name = name
+                plan_data = info
+                break
+    
+    if plan_data:
+        bot.answer_callback_query(call.id, f"📝 {plan_name} selected!")
+        show_plan_details(
+            call.message.chat.id, 
+            call.message.message_id,
+            "🥇 PRIME",
+            plan_name,
+            days,
+            plan_data['price'],
+            plan_data['qr']
+        )
+    else:
+        bot.answer_callback_query(call.id, "❌ Plan not found!", show_alert=True)
+    return
+
+if data.startswith('buy_vip_'):
+    parts = data.split('_')
+    days = int(parts[2])
+    plan_name = '_'.join(parts[3:])
+    
+    plan_data = VIP_PLANS.get(plan_name)
+    if not plan_data:
+        for name, info in VIP_PLANS.items():
+            if info['days'] == days:
+                plan_name = name
+                plan_data = info
+                break
+    
+    if plan_data:
+        bot.answer_callback_query(call.id, f"📝 {plan_name} selected!")
+        show_plan_details(
+            call.message.chat.id, 
+            call.message.message_id,
+            "⭐ VIP",
+            plan_name,
+            days,
+            plan_data['price'],
+            plan_data['qr']
+        )
+    else:
+        bot.answer_callback_query(call.id, "❌ Plan not found!", show_alert=True)
+    return
+
+if data == 'back_to_prime_plans':
+    bot.answer_callback_query(call.id, "🔙 Back to Prime Plans")
+    show_prime_plans(call.message.chat.id, call.message.message_id)
+    return
+
+if data == 'back_to_vip_plans':
+    bot.answer_callback_query(call.id, "🔙 Back to VIP Plans")
+    show_vip_plans(call.message.chat.id, call.message.message_id)
+    return
     
     try:
         # =============== PAYMENT CALLBACKS ===============
