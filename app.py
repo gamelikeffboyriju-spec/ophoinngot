@@ -88,7 +88,6 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# =============== ULTRA V100 PRICE PLANS WITH SEPARATE QR ===============
 PRIME_PLANS = {
     "5 Days": {"days": 5, "price": "₹50", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
     "15 Days": {"days": 15, "price": "₹100", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
@@ -110,7 +109,6 @@ VIP_PLANS = {
     "Life Time": {"days": 99999, "price": "₹10000", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"}
 }
 
-# =============== ULTRA V100 UI COMMAND BUTTONS ===============
 COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
     ["📢 Updates Channel", "⏱ Uptime"],
     ["📤 Upload File", "📂 Check Files"],
@@ -1486,6 +1484,28 @@ def get_system_stats():
         logger.error(f"Error getting system stats: {e}")
         return None
 
+def _logic_all_users_bots(message):
+    if message.from_user.id not in admin_ids:
+        bot.reply_to(message, "👑 Admin permissions required.")
+        return
+    
+    if not user_files:
+        bot.reply_to(message, "📁 No users have uploaded any files yet.")
+        return
+    
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    for uid, files in user_files.items():
+        if files:
+            for file_name, file_type in files:
+                is_running = is_bot_running(uid, file_name)
+                status_icon = "🟢" if is_running else "🔴"
+                btn_text = f"{status_icon} User {uid}: {file_name} ({file_type})"
+                markup.add(types.InlineKeyboardButton(btn_text, callback_data=f'file_{uid}_{file_name}'))
+    
+    markup.add(types.InlineKeyboardButton("🔙 Back to Admin", callback_data='admin_panel'))
+    bot.reply_to(message, "👥 **All Users' Bots:**\nClick to control any bot.", 
+                reply_markup=markup, parse_mode='Markdown')
+
 def _logic_send_welcome(message):
     user_id = message.from_user.id
     chat_id = message.chat.id
@@ -2023,6 +2043,10 @@ def prime_command(message):
 def vip_command(message):
     show_vip_plans(message.chat.id)
 
+@bot.message_handler(commands=['allusersbots'])
+def command_all_users_bots(message):
+    _logic_all_users_bots(message)
+
 @bot.message_handler(func=lambda message: message.text == "💲 Prime Plans")
 def prime_button_handler(message):
     show_prime_plans(message.chat.id)
@@ -2049,7 +2073,8 @@ def admin_commands(message):
                              "/admin unban <id> - Unban user\n"
                              "/admin host <id> <time> <files> - Add hosting\n"
                              "/admin remove <id> - Remove user's hosting\n"
-                             "/admin stats - System stats")
+                             "/admin stats - System stats\n"
+                             "/admin allusers - Show all users bots")
         return
     command = args[1].lower()
     user_id = int(args[2]) if len(args) > 2 else None
@@ -2059,7 +2084,8 @@ def admin_commands(message):
             return
         time_str = args[3]
         files = int(args[4].replace('f', ''))
-        add_prime_to_user(user_id, int(time_str.replace('d', '').replace('h', '')))
+        days = int(''.join(filter(str.isdigit, time_str)))
+        add_prime_to_user(user_id, days)
         bot.reply_to(message, f"✅ Prime added to user {user_id} for {time_str} with {files} files.")
     elif command == "vip":
         if len(args) < 5:
@@ -2067,7 +2093,8 @@ def admin_commands(message):
             return
         time_str = args[3]
         files = int(args[4].replace('f', ''))
-        add_vip_to_user(user_id, int(time_str.replace('d', '').replace('h', '')))
+        days = int(''.join(filter(str.isdigit, time_str)))
+        add_vip_to_user(user_id, days)
         bot.reply_to(message, f"✅ VIP added to user {user_id} for {time_str} with {files} files.")
     elif command == "ban":
         if user_id is None:
@@ -2097,8 +2124,10 @@ def admin_commands(message):
         bot.reply_to(message, f"✅ Removed hosting for user {user_id}.")
     elif command == "stats":
         _logic_system_stats(message)
+    elif command == "allusers":
+        _logic_all_users_bots(message)
     else:
-        bot.reply_to(message, "❌ Invalid admin command. Use prime, vip, ban, unban, host, remove, stats.")
+        bot.reply_to(message, "❌ Invalid admin command. Use prime, vip, ban, unban, host, remove, stats, allusers.")
 
 @bot.message_handler(commands=['globalhistory'])
 def global_file_history(message):
@@ -2136,28 +2165,6 @@ def handle_button_text(message):
     if logic_func: logic_func(message)
     else: logger.warning(f"Button text '{message.text}' matched but no logic func.")
 
-def _logic_all_users_bots(message):
-    if message.from_user.id not in admin_ids:
-        bot.reply_to(message, "👑 Admin permissions required.")
-        return
-    
-    if not user_files:
-        bot.reply_to(message, "📁 No users have uploaded any files yet.")
-        return
-    
-    markup = types.InlineKeyboardMarkup(row_width=1)
-    for uid, files in user_files.items():
-        if files:
-            for file_name, file_type in files:
-                is_running = is_bot_running(uid, file_name)
-                status_icon = "🟢" if is_running else "🔴"
-                btn_text = f"{status_icon} User {uid}: {file_name} ({file_type})"
-                markup.add(types.InlineKeyboardButton(btn_text, callback_data=f'file_{uid}_{file_name}'))
-    
-    markup.add(types.InlineKeyboardButton("🔙 Back to Admin", callback_data='admin_panel'))
-    bot.reply_to(message, "👥 **All Users' Bots:**\nClick to control any bot.", 
-                reply_markup=markup, parse_mode='Markdown')
-
 @bot.message_handler(commands=['updateschannel'])
 def command_updates_channel(message): _logic_updates_channel(message)
 @bot.message_handler(commands=['uploadfile'])
@@ -2180,8 +2187,6 @@ def command_lock_bot(message): _logic_toggle_lock_bot(message)
 def command_admin_panel(message): _logic_admin_panel(message)
 @bot.message_handler(commands=['runningallcode'])
 def command_run_all_code(message): _logic_run_all_scripts(message)
-@bot.message_handler(commands=['allusersbots'])
-def command_all_users_bots(message): _logic_all_users_bots(message)
 
 @bot.message_handler(content_types=['document'])
 def handle_file_upload_doc(message):
