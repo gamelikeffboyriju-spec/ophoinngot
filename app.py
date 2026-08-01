@@ -27,7 +27,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "🤖 BRONX ULTRA OSINT BOT v100 ULTRA is running!"
+    return "🤖 BRONX ULTRA OSINT BOT v120 ULTRA is running!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -88,6 +88,7 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# =============== PRICE PLANS WITH SEPARATE QR ===============
 PRIME_PLANS = {
     "5 Days": {"days": 5, "price": "₹50", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
     "15 Days": {"days": 15, "price": "₹100", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
@@ -1303,6 +1304,7 @@ def show_plan_details(chat_id, message_id, plan_type, plan_name, days, price, qr
     markup = create_payment_buttons("prime" if plan_type == "🥇 PRIME" else "vip", plan_name, days, price)
     
     try:
+        # Send photo with caption and buttons
         bot.send_photo(chat_id, qr_url, caption=text, reply_markup=markup, parse_mode='Markdown')
         if message_id:
             try:
@@ -2047,6 +2049,72 @@ def vip_command(message):
 def command_all_users_bots(message):
     _logic_all_users_bots(message)
 
+@bot.message_handler(commands=['addprime'])
+def add_prime_command(message):
+    if message.from_user.id not in admin_ids:
+        bot.reply_to(message, "👑 Admin permissions required.")
+        return
+    args = message.text.split()
+    if len(args) < 3:
+        bot.reply_to(message, "Usage: /addprime <user_id> <days>")
+        return
+    try:
+        user_id = int(args[1])
+        days = int(args[2])
+        add_prime_to_user(user_id, days)
+        bot.reply_to(message, f"✅ Prime added to user {user_id} for {days} days!")
+    except Exception as e:
+        bot.reply_to(message, f"❌ Error: {e}")
+
+@bot.message_handler(commands=['addvip'])
+def add_vip_command(message):
+    if message.from_user.id not in admin_ids:
+        bot.reply_to(message, "👑 Admin permissions required.")
+        return
+    args = message.text.split()
+    if len(args) < 3:
+        bot.reply_to(message, "Usage: /addvip <user_id> <days>")
+        return
+    try:
+        user_id = int(args[1])
+        days = int(args[2])
+        add_vip_to_user(user_id, days)
+        bot.reply_to(message, f"✅ VIP added to user {user_id} for {days} days!")
+    except Exception as e:
+        bot.reply_to(message, f"❌ Error: {e}")
+
+@bot.message_handler(commands=['ban'])
+def ban_command(message):
+    if message.from_user.id not in admin_ids:
+        bot.reply_to(message, "👑 Admin permissions required.")
+        return
+    args = message.text.split()
+    if len(args) < 2:
+        bot.reply_to(message, "Usage: /ban <user_id>")
+        return
+    try:
+        user_id = int(args[1])
+        add_ban(user_id)
+        bot.reply_to(message, f"🚫 User {user_id} banned!")
+    except Exception as e:
+        bot.reply_to(message, f"❌ Error: {e}")
+
+@bot.message_handler(commands=['unban'])
+def unban_command(message):
+    if message.from_user.id not in admin_ids:
+        bot.reply_to(message, "👑 Admin permissions required.")
+        return
+    args = message.text.split()
+    if len(args) < 2:
+        bot.reply_to(message, "Usage: /unban <user_id>")
+        return
+    try:
+        user_id = int(args[1])
+        remove_ban(user_id)
+        bot.reply_to(message, f"✅ User {user_id} unbanned!")
+    except Exception as e:
+        bot.reply_to(message, f"❌ Error: {e}")
+
 @bot.message_handler(func=lambda message: message.text == "💲 Prime Plans")
 def prime_button_handler(message):
     show_prime_plans(message.chat.id)
@@ -2267,6 +2335,7 @@ def handle_callbacks(call):
     data = call.data
     logger.info(f"Callback: User={user_id}, Data='{data}'")
 
+    # =============== PRICE PLANS CALLBACKS ===============
     if data == 'show_prime_plans':
         bot.answer_callback_query(call.id, "🥇 Loading Prime Plans...")
         try:
@@ -2373,8 +2442,9 @@ def handle_callbacks(call):
             bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
             return
 
-    try:
-        if data.startswith('pay_done_'):
+    # =============== PAYMENT CALLBACKS ===============
+    if data.startswith('pay_done_'):
+        try:
             parts = data.split('_')
             plan_type = parts[2]
             days = int(parts[3])
@@ -2390,6 +2460,7 @@ def handle_callbacks(call):
             
             bot.answer_callback_query(call.id, "✅ Payment notification sent to owner!")
             
+            # Send notification to owner with QR
             send_payment_notification(user_id, plan_type_display, plan_name, days, price)
             
             bot.send_message(call.message.chat.id, 
@@ -2405,19 +2476,25 @@ def handle_callbacks(call):
             except:
                 pass
             return
-        
-        elif data == 'pay_reject':
-            bot.answer_callback_query(call.id, "❌ Payment rejected!")
-            bot.send_message(call.message.chat.id, 
-                            f"❌ **Payment Rejected!**\n\n"
-                            f"If you have any questions, contact: {YOUR_USERNAME}", parse_mode='Markdown')
-            try:
-                bot.delete_message(call.message.chat.id, call.message.message_id)
-            except:
-                pass
+        except Exception as e:
+            logger.error(f"Pay done error: {e}")
+            bot.answer_callback_query(call.id, "❌ Error processing payment!", show_alert=True)
             return
+    
+    if data == 'pay_reject':
+        bot.answer_callback_query(call.id, "❌ Payment rejected!")
+        bot.send_message(call.message.chat.id, 
+                        f"❌ **Payment Rejected!**\n\n"
+                        f"If you have any questions, contact: {YOUR_USERNAME}", parse_mode='Markdown')
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except:
+            pass
+        return
 
-        elif data.startswith('add_prime_'):
+    # =============== ADMIN PAYMENT APPROVAL ===============
+    if data.startswith('add_prime_'):
+        try:
             parts = data.split('_')
             target_user_id = int(parts[2])
             days = int(parts[3])
@@ -2428,16 +2505,26 @@ def handle_callbacks(call):
             
             add_prime_to_user(target_user_id, days)
             bot.answer_callback_query(call.id, f"✅ Prime added to user {target_user_id}!")
-            bot.edit_message_text(f"✅ Prime added to user {target_user_id} for {days} days!", 
-                                call.message.chat.id, call.message.message_id)
+            
+            # Edit the message to show success
+            try:
+                bot.edit_message_text(f"✅ **Prime Added Successfully!**\n\nUser: `{target_user_id}`\nDays: {days}\nStatus: 🔱 PRIME", 
+                                    call.message.chat.id, call.message.message_id, parse_mode='Markdown')
+            except:
+                pass
             
             try:
                 bot.send_message(OWNER_ID, f"✅ Prime added to user {target_user_id} for {days} days by Admin {user_id}!")
             except:
                 pass
             return
-        
-        elif data.startswith('add_vip_'):
+        except Exception as e:
+            logger.error(f"Add prime error: {e}")
+            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
+            return
+    
+    if data.startswith('add_vip_'):
+        try:
             parts = data.split('_')
             target_user_id = int(parts[2])
             days = int(parts[3])
@@ -2448,16 +2535,25 @@ def handle_callbacks(call):
             
             add_vip_to_user(target_user_id, days)
             bot.answer_callback_query(call.id, f"✅ VIP added to user {target_user_id}!")
-            bot.edit_message_text(f"✅ VIP added to user {target_user_id} for {days} days!", 
-                                call.message.chat.id, call.message.message_id)
+            
+            try:
+                bot.edit_message_text(f"✅ **VIP Added Successfully!**\n\nUser: `{target_user_id}`\nDays: {days}\nStatus: ⭐ VIP", 
+                                    call.message.chat.id, call.message.message_id, parse_mode='Markdown')
+            except:
+                pass
             
             try:
                 bot.send_message(OWNER_ID, f"✅ VIP added to user {target_user_id} for {days} days by Admin {user_id}!")
             except:
                 pass
             return
-        
-        elif data.startswith('reject_payment_'):
+        except Exception as e:
+            logger.error(f"Add vip error: {e}")
+            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
+            return
+    
+    if data.startswith('reject_payment_'):
+        try:
             target_user_id = int(data.replace('reject_payment_', ''))
             
             if user_id not in admin_ids:
@@ -2465,8 +2561,12 @@ def handle_callbacks(call):
                 return
             
             bot.answer_callback_query(call.id, f"❌ Payment rejected for user {target_user_id}!")
-            bot.edit_message_text(f"❌ Payment rejected for user {target_user_id}!", 
-                                call.message.chat.id, call.message.message_id)
+            
+            try:
+                bot.edit_message_text(f"❌ **Payment Rejected!**\n\nUser: `{target_user_id}`\nStatus: ❌ Rejected", 
+                                    call.message.chat.id, call.message.message_id, parse_mode='Markdown')
+            except:
+                pass
             
             try:
                 bot.send_message(OWNER_ID, f"❌ Payment rejected for user {target_user_id} by Admin {user_id}!")
@@ -2480,140 +2580,176 @@ def handle_callbacks(call):
             except:
                 pass
             return
-
-        elif data == 'all_users_bots':
-            if user_id not in admin_ids:
-                bot.answer_callback_query(call.id, "👑 Admin only!", show_alert=True)
-                return
-            
-            bot.answer_callback_query(call.id, "👥 Loading all users' bots...")
-            
-            if not user_files:
-                bot.send_message(call.message.chat.id, "📁 No users have uploaded any files yet.")
-                return
-            
-            markup = types.InlineKeyboardMarkup(row_width=1)
-            for uid, files in user_files.items():
-                if files:
-                    for file_name, file_type in files:
-                        is_running = is_bot_running(uid, file_name)
-                        status_icon = "🟢" if is_running else "🔴"
-                        btn_text = f"{status_icon} User {uid}: {file_name} ({file_type})"
-                        markup.add(types.InlineKeyboardButton(btn_text, callback_data=f'file_{uid}_{file_name}'))
-            
-            markup.add(types.InlineKeyboardButton("🔙 Back to Admin", callback_data='admin_panel'))
-            bot.send_message(call.message.chat.id, "👥 **All Users' Bots:**\nClick to control any bot.", 
-                            reply_markup=markup, parse_mode='Markdown')
+        except Exception as e:
+            logger.error(f"Reject payment error: {e}")
+            bot.answer_callback_query(call.id, "❌ Error!", show_alert=True)
             return
 
-        elif data == 'bot_manager':
-            admin_required_callback(call, _logic_bot_manager)
+    # =============== ALL USERS BOTS ===============
+    if data == 'all_users_bots':
+        if user_id not in admin_ids:
+            bot.answer_callback_query(call.id, "👑 Admin only!", show_alert=True)
             return
         
-        elif data == 'list_all_bots':
-            admin_required_callback(call, _logic_list_all_bots)
+        bot.answer_callback_query(call.id, "👥 Loading all users' bots...")
+        
+        if not user_files:
+            bot.send_message(call.message.chat.id, "📁 No users have uploaded any files yet.")
             return
         
-        elif data == 'toggle_auto_restart':
-            admin_required_callback(call, _logic_toggle_auto_restart)
-            return
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        for uid, files in user_files.items():
+            if files:
+                for file_name, file_type in files:
+                    is_running = is_bot_running(uid, file_name)
+                    status_icon = "🟢" if is_running else "🔴"
+                    btn_text = f"{status_icon} User {uid}: {file_name} ({file_type})"
+                    markup.add(types.InlineKeyboardButton(btn_text, callback_data=f'file_{uid}_{file_name}'))
         
-        elif data == 'clean_dead_bots':
-            admin_required_callback(call, _logic_clean_dead_bots)
-            return
-        
-        elif data == 'system_stats':
-            admin_required_callback(call, _logic_system_stats)
-            return
+        markup.add(types.InlineKeyboardButton("🔙 Back to Admin", callback_data='admin_panel'))
+        bot.send_message(call.message.chat.id, "👥 **All Users' Bots:**\nClick to control any bot.", 
+                        reply_markup=markup, parse_mode='Markdown')
+        return
 
-        elif data == 'upload':
-            upload_callback(call)
-        elif data == 'check_files':
-            check_files_callback(call)
-        elif data.startswith('file_'):
-            file_control_callback(call)
-        elif data.startswith('start_'):
-            start_bot_callback(call)
-        elif data.startswith('stop_'):
-            stop_bot_callback(call)
-        elif data.startswith('restart_'):
-            restart_bot_callback(call)
-        elif data.startswith('delete_'):
-            delete_bot_callback(call)
-        elif data.startswith('logs_'):
-            logs_bot_callback(call)
-        elif data.startswith('code_'):
-            view_code_callback(call)
-        elif data.startswith('view_file_'):
-            view_global_file_callback(call)
-        
-        elif data == 'chatgpt':
-            bot.answer_callback_query(call.id, "🤖 ChatGPT")
-            bot.send_message(call.message.chat.id, 
-                            "🤖 **ChatGPT**\n\n"
-                            "Send your query using:\n"
-                            "`/chatgpt Your question`\n"
-                            "`/gpt Your question`\n"
-                            "`/ai Your question`\n\n"
-                            "Or simply type `/mpx Your question`", parse_mode='Markdown')
-            return
-        elif data == 'speed':
-            speed_callback(call)
-        elif data == 'back_to_main':
-            back_to_main_callback(call)
-        elif data.startswith('confirm_broadcast_'):
-            handle_confirm_broadcast(call)
-        elif data == 'cancel_broadcast':
-            handle_cancel_broadcast(call)
-        elif data == 'subscription':
-            admin_required_callback(call, subscription_management_callback)
-        elif data == 'stats':
-            stats_callback(call)
-        elif data == 'lock_bot':
-            admin_required_callback(call, lock_bot_callback)
-        elif data == 'unlock_bot':
-            admin_required_callback(call, unlock_bot_callback)
-        elif data == 'run_all_scripts':
-            admin_required_callback(call, run_all_scripts_callback)
-        elif data == 'broadcast':
-            admin_required_callback(call, broadcast_init_callback)
-        elif data == 'admin_panel':
-            admin_required_callback(call, admin_panel_callback)
-        elif data == 'free_settings':
-            admin_required_callback(call, free_settings_callback)
-        elif data.startswith('toggle_free_'):
-            admin_required_callback(call, toggle_free_user_callback)
-        elif data == 'set_free_files':
-            admin_required_callback(call, set_free_files_callback)
-        elif data == 'set_free_hours':
-            admin_required_callback(call, set_free_hours_callback)
-        elif data == 'add_admin':
-            owner_required_callback(call, add_admin_init_callback)
-        elif data == 'remove_admin':
-            owner_required_callback(call, remove_admin_init_callback)
-        elif data == 'list_admins':
-            admin_required_callback(call, list_admins_callback)
-        elif data == 'add_subscription':
-            admin_required_callback(call, add_subscription_init_callback)
-        elif data == 'remove_subscription':
-            admin_required_callback(call, remove_subscription_init_callback)
-        elif data == 'check_subscription':
-            admin_required_callback(call, check_subscription_init_callback)
-        elif data == 'uptime':
-            bot.answer_callback_query(call.id)
-            uptime_str = get_uptime()
-            bot.send_message(call.message.chat.id, f"⏱ Bot Uptime: `{uptime_str}`", parse_mode='Markdown')
-        elif data == 'global_history':
-            admin_required_callback(call, global_history_callback)
-        else:
-            bot.answer_callback_query(call.id, "❌ Unknown action.")
-            logger.warning(f"Unhandled callback data: {data} from user {user_id}")
-    except Exception as e:
-        logger.error(f"Error handling callback '{data}' for {user_id}: {e}", exc_info=True)
-        try:
-            bot.answer_callback_query(call.id, "❌ Error processing request.", show_alert=True)
-        except Exception as e_ans:
-            logger.error(f"Failed to answer callback after error: {e_ans}")
+    # =============== BOT MANAGER ===============
+    if data == 'bot_manager':
+        admin_required_callback(call, _logic_bot_manager)
+        return
+    
+    if data == 'list_all_bots':
+        admin_required_callback(call, _logic_list_all_bots)
+        return
+    
+    if data == 'toggle_auto_restart':
+        admin_required_callback(call, _logic_toggle_auto_restart)
+        return
+    
+    if data == 'clean_dead_bots':
+        admin_required_callback(call, _logic_clean_dead_bots)
+        return
+    
+    if data == 'system_stats':
+        admin_required_callback(call, _logic_system_stats)
+        return
+
+    # =============== FILE MANAGEMENT ===============
+    if data == 'upload':
+        upload_callback(call)
+        return
+    if data == 'check_files':
+        check_files_callback(call)
+        return
+    if data.startswith('file_'):
+        file_control_callback(call)
+        return
+    if data.startswith('start_'):
+        start_bot_callback(call)
+        return
+    if data.startswith('stop_'):
+        stop_bot_callback(call)
+        return
+    if data.startswith('restart_'):
+        restart_bot_callback(call)
+        return
+    if data.startswith('delete_'):
+        delete_bot_callback(call)
+        return
+    if data.startswith('logs_'):
+        logs_bot_callback(call)
+        return
+    if data.startswith('code_'):
+        view_code_callback(call)
+        return
+    if data.startswith('view_file_'):
+        view_global_file_callback(call)
+        return
+    
+    # =============== OTHER CALLBACKS ===============
+    if data == 'chatgpt':
+        bot.answer_callback_query(call.id, "🤖 ChatGPT")
+        bot.send_message(call.message.chat.id, 
+                        "🤖 **ChatGPT**\n\n"
+                        "Send your query using:\n"
+                        "`/chatgpt Your question`\n"
+                        "`/gpt Your question`\n"
+                        "`/ai Your question`\n\n"
+                        "Or simply type `/mpx Your question`", parse_mode='Markdown')
+        return
+    if data == 'speed':
+        speed_callback(call)
+        return
+    if data == 'back_to_main':
+        back_to_main_callback(call)
+        return
+    if data.startswith('confirm_broadcast_'):
+        handle_confirm_broadcast(call)
+        return
+    if data == 'cancel_broadcast':
+        handle_cancel_broadcast(call)
+        return
+    if data == 'subscription':
+        admin_required_callback(call, subscription_management_callback)
+        return
+    if data == 'stats':
+        stats_callback(call)
+        return
+    if data == 'lock_bot':
+        admin_required_callback(call, lock_bot_callback)
+        return
+    if data == 'unlock_bot':
+        admin_required_callback(call, unlock_bot_callback)
+        return
+    if data == 'run_all_scripts':
+        admin_required_callback(call, run_all_scripts_callback)
+        return
+    if data == 'broadcast':
+        admin_required_callback(call, broadcast_init_callback)
+        return
+    if data == 'admin_panel':
+        admin_required_callback(call, admin_panel_callback)
+        return
+    if data == 'free_settings':
+        admin_required_callback(call, free_settings_callback)
+        return
+    if data.startswith('toggle_free_'):
+        admin_required_callback(call, toggle_free_user_callback)
+        return
+    if data == 'set_free_files':
+        admin_required_callback(call, set_free_files_callback)
+        return
+    if data == 'set_free_hours':
+        admin_required_callback(call, set_free_hours_callback)
+        return
+    if data == 'add_admin':
+        owner_required_callback(call, add_admin_init_callback)
+        return
+    if data == 'remove_admin':
+        owner_required_callback(call, remove_admin_init_callback)
+        return
+    if data == 'list_admins':
+        admin_required_callback(call, list_admins_callback)
+        return
+    if data == 'add_subscription':
+        admin_required_callback(call, add_subscription_init_callback)
+        return
+    if data == 'remove_subscription':
+        admin_required_callback(call, remove_subscription_init_callback)
+        return
+    if data == 'check_subscription':
+        admin_required_callback(call, check_subscription_init_callback)
+        return
+    if data == 'uptime':
+        bot.answer_callback_query(call.id)
+        uptime_str = get_uptime()
+        bot.send_message(call.message.chat.id, f"⏱ Bot Uptime: `{uptime_str}`", parse_mode='Markdown')
+        return
+    if data == 'global_history':
+        admin_required_callback(call, global_history_callback)
+        return
+    
+    # Unknown callback
+    bot.answer_callback_query(call.id, "❌ Unknown action.")
+    logger.warning(f"Unhandled callback data: {data} from user {user_id}")
 
 def admin_required_callback(call, func_to_run):
     if call.from_user.id not in admin_ids:
@@ -3720,7 +3856,7 @@ def cleanup():
 atexit.register(cleanup)
 
 if __name__ == '__main__':
-    logger.info("="*40 + "\n🌟 BRONX ULTRA OSINT BOT v100 ULTRA 🌟\n" + 
+    logger.info("="*40 + "\n🌟 BRONX ULTRA OSINT BOT v120 ULTRA 🌟\n" + 
                 f"🐍 Python: {sys.version.split()[0]}\n" +
                 f"📁 Base Dir: {BASE_DIR}\n" +
                 f"📂 Upload Dir: {UPLOAD_BOTS_DIR}\n" +
