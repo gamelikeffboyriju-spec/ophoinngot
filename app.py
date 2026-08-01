@@ -27,7 +27,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "🤖 BRONX ULTRA OSINT BOT v120 ULTRA is running!"
+    return "🤖 BRONX ULTRA OSINT BOT v150 ULTRA is running!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -88,25 +88,28 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# QR CODE - USING RELIABLE IMAGE URL
+QR_CODE_URL = "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"
+
 PRIME_PLANS = {
-    "5 Days": {"days": 5, "price": "₹50", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
-    "15 Days": {"days": 15, "price": "₹100", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
-    "30 Days": {"days": 30, "price": "₹199", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
-    "40 Days": {"days": 40, "price": "₹240", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
-    "60 Days": {"days": 60, "price": "₹299", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
-    "80 Days": {"days": 80, "price": "₹499", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
-    "150 Days": {"days": 150, "price": "₹799", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
-    "365 Days": {"days": 365, "price": "₹999", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"}
+    "5 Days": {"days": 5, "price": "₹50"},
+    "15 Days": {"days": 15, "price": "₹100"},
+    "30 Days": {"days": 30, "price": "₹199"},
+    "40 Days": {"days": 40, "price": "₹240"},
+    "60 Days": {"days": 60, "price": "₹299"},
+    "80 Days": {"days": 80, "price": "₹499"},
+    "150 Days": {"days": 150, "price": "₹799"},
+    "365 Days": {"days": 365, "price": "₹999"}
 }
 
 VIP_PLANS = {
-    "30 Days": {"days": 30, "price": "₹300", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
-    "60 Days": {"days": 60, "price": "₹600", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
-    "80 Days": {"days": 80, "price": "₹800", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
-    "150 Days": {"days": 150, "price": "₹1500", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
-    "200 Days": {"days": 200, "price": "₹2000", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
-    "365 Days": {"days": 365, "price": "₹36500", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"},
-    "Life Time": {"days": 99999, "price": "₹10000", "qr": "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"}
+    "30 Days": {"days": 30, "price": "₹300"},
+    "60 Days": {"days": 60, "price": "₹600"},
+    "80 Days": {"days": 80, "price": "₹800"},
+    "150 Days": {"days": 150, "price": "₹1500"},
+    "200 Days": {"days": 200, "price": "₹2000"},
+    "365 Days": {"days": 365, "price": "₹36500"},
+    "Life Time": {"days": 99999, "price": "₹10000"}
 }
 
 COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
@@ -413,7 +416,7 @@ def run_script(script_path, script_owner_id, user_folder, file_name, message_obj
     logger.info(f"Attempt {attempt} to run Python script: {script_path} (Key: {script_key}) for user {script_owner_id}")
 
     if not can_user_host(script_owner_id):
-        bot.reply_to(message_obj_for_reply, "⏰ Your hosting time has expired! Please contact admin.")
+        bot.reply_to(message_obj_for_reply, "⏰ Your hosting time has expired! Please purchase 💲 Prime Plans/⭐ VIP Plans")
         return
 
     try:
@@ -639,7 +642,7 @@ def run_js_script(script_path, script_owner_id, user_folder, file_name, message_
     logger.info(f"Attempt {attempt} to run JS script: {script_path} (Key: {script_key}) for user {script_owner_id}")
 
     if not can_user_host(script_owner_id):
-        bot.reply_to(message_obj_for_reply, "⏰ Your hosting time has expired! Please contact admin.")
+        bot.reply_to(message_obj_for_reply, "⏰ Your hosting time has expired! Please purchase 💲 Prime Plans/⭐ VIP Plans")
         return
 
     try:
@@ -1042,9 +1045,15 @@ def create_vip_plans():
 
 def create_payment_buttons(plan_type, plan_name, days, price):
     markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(types.InlineKeyboardButton("✅ Payment Done", callback_data=f'pay_done_{plan_type}_{days}_{plan_name}'))
-    markup.add(types.InlineKeyboardButton("❌ Payment Reject", callback_data='pay_reject'))
-    markup.add(types.InlineKeyboardButton("🔙 Back to Plans", callback_data=f'back_to_{plan_type}_plans'))
+    markup.add(
+        types.InlineKeyboardButton("✅ Payment Done", callback_data=f'pay_done_{plan_type}_{days}_{plan_name}')
+    )
+    markup.add(
+        types.InlineKeyboardButton("❌ Payment Reject", callback_data='pay_reject')
+    )
+    markup.add(
+        types.InlineKeyboardButton("🔙 Back to Plans", callback_data=f'back_to_{plan_type}_plans')
+    )
     return markup
 
 def create_free_settings_panel():
@@ -1267,7 +1276,7 @@ def show_vip_plans(chat_id, message_id=None):
     else:
         bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
 
-def show_plan_details(chat_id, message_id, plan_type, plan_name, days, price, qr_url):
+def show_plan_details(chat_id, message_id, plan_type, plan_name, days, price):
     text = f"""📝 **{plan_type} Plan Selected:** {plan_name}
 
 💰 **Price:** {price}
@@ -1294,16 +1303,23 @@ def show_plan_details(chat_id, message_id, plan_type, plan_name, days, price, qr
     
     text += f"""
 
-📱 **Scan QR to Pay:**
+📱 **Payment Method:**
+1️⃣ Send payment to the QR Code below
+2️⃣ Click **"✅ Payment Done"** after payment
+3️⃣ Wait for admin approval
 
-📞 Contact: {YOUR_USERNAME}
+📞 Contact for support: {YOUR_USERNAME}
 
-⚠️ After payment, click **"Payment Done"** below!"""
+⚠️ **Important:** Send payment screenshot to admin after payment!"""
 
     markup = create_payment_buttons("prime" if plan_type == "🥇 PRIME" else "vip", plan_name, days, price)
     
+    # Try to send QR image first
     try:
-        bot.send_photo(chat_id, qr_url, caption=text, reply_markup=markup, parse_mode='Markdown')
+        # Send QR with caption
+        bot.send_photo(chat_id, QR_CODE_URL, caption=text, reply_markup=markup, parse_mode='Markdown')
+        
+        # Delete the original plans message
         if message_id:
             try:
                 bot.delete_message(chat_id, message_id)
@@ -1311,7 +1327,8 @@ def show_plan_details(chat_id, message_id, plan_type, plan_name, days, price, qr
                 pass
     except Exception as e:
         logger.error(f"Error sending QR: {e}")
-        text += f"\n\n🔗 QR Link: {qr_url}"
+        # Fallback: Send text message with QR link
+        text += f"\n\n🔗 **QR Code Link:** {QR_CODE_URL}"
         if message_id:
             try:
                 bot.edit_message_text(text, chat_id, message_id, reply_markup=markup, parse_mode='Markdown')
@@ -1360,8 +1377,6 @@ def send_payment_notification(user_id, plan_type, plan_name, days, price):
     elif user_id == OWNER_ID:
         status = "👑 Owner"
     
-    qr_url = "https://i.ibb.co/mVyp4G45/Screenshot-20260730-144036-1.jpg"
-    
     text = f"""💳 **Payment Notification** 💳
 
 👤 **User Details:**
@@ -1387,10 +1402,11 @@ def send_payment_notification(user_id, plan_type, plan_name, days, price):
     markup.add(types.InlineKeyboardButton("❌ Reject Payment", callback_data=f'reject_payment_{user_id}'))
     
     try:
-        bot.send_photo(OWNER_ID, qr_url, caption=text, reply_markup=markup, parse_mode='Markdown')
+        # Send QR with notification
+        bot.send_photo(OWNER_ID, QR_CODE_URL, caption=text, reply_markup=markup, parse_mode='Markdown')
     except Exception as e:
         logger.error(f"Error sending payment notification to owner: {e}")
-        text += f"\n🔗 QR Link: {qr_url}"
+        text += f"\n🔗 QR Link: {QR_CODE_URL}"
         bot.send_message(OWNER_ID, text, reply_markup=markup, parse_mode='Markdown')
 
 def send_subscription_confirmation(user_id, status_type, expiry_date):
@@ -2199,7 +2215,7 @@ def handle_file_upload_doc(message):
         return
 
     if not can_user_host(user_id):
-        bot.reply_to(message, "⏰ Your hosting time has expired! Please contact admin.")
+        bot.reply_to(message, "⏰ Your hosting time has expired! Please purchase 💲 Prime Plans/⭐ VIP Plans")
         return
 
     file_limit = get_user_file_limit(user_id)
@@ -2304,8 +2320,7 @@ def handle_callbacks(call):
                     "🥇 PRIME",
                     plan_name,
                     days,
-                    plan_data['price'],
-                    plan_data['qr']
+                    plan_data['price']
                 )
             else:
                 bot.answer_callback_query(call.id, "❌ Plan not found!", show_alert=True)
@@ -2337,8 +2352,7 @@ def handle_callbacks(call):
                     "⭐ VIP",
                     plan_name,
                     days,
-                    plan_data['price'],
-                    plan_data['qr']
+                    plan_data['price']
                 )
             else:
                 bot.answer_callback_query(call.id, "❌ Plan not found!", show_alert=True)
@@ -3729,7 +3743,7 @@ def cleanup():
 atexit.register(cleanup)
 
 if __name__ == '__main__':
-    logger.info("="*40 + "\n🌟 BRONX ULTRA OSINT BOT v120 ULTRA 🌟\n" + 
+    logger.info("="*40 + "\n🌟 BRONX ULTRA OSINT BOT v150 ULTRA 🌟\n" + 
                 f"🐍 Python: {sys.version.split()[0]}\n" +
                 f"📁 Base Dir: {BASE_DIR}\n" +
                 f"📂 Upload Dir: {UPLOAD_BOTS_DIR}\n" +
